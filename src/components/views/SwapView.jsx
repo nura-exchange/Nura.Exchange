@@ -28,6 +28,7 @@ export default function SwapView() {
   const [slippage, setSlippage] = useState(0.5)
   const [approveConfirmed, setApproveConfirmed] = useState(false)
   const actionRef = useRef(null)
+  const pendingSwapRef = useRef(null)
   const pyth = usePythRate()
 
   const { balance: usdcBalance } = useUsdcBalance()
@@ -99,6 +100,7 @@ export default function SwapView() {
         window.dispatchEvent(new Event('anchorfx:refresh'))
         notify('Approval Confirmed', `${inSymbol} approved for AnchorFX Router`, 'success')
       } else {
+        pendingSwapRef.current = null
         notify('Approval Failed', 'Transaction reverted on-chain', 'error')
       }
     }
@@ -126,9 +128,34 @@ export default function SwapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receipt])
 
+  // Auto-fire swap right after approval confirms
+  useEffect(() => {
+    if (approveConfirmed && pendingSwapRef.current) {
+      actionRef.current = 'swap'
+      const cfg = pendingSwapRef.current
+      pendingSwapRef.current = null
+      writeContract(cfg)
+      notify('Swap Submitted', 'Executing swap automatically…', 'info')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [approveConfirmed])
+
+  function buildSwapArgs() {
+    return {
+      address: ANCHOR_FX_ROUTER_ADDRESS,
+      abi: ANCHOR_FX_ROUTER_ABI,
+      functionName: 'swapFX',
+      args: [tokenIn, tokenOut, parsedAmount, minOutParsed, parseUnits(rate, 18)],
+      gas: 300000n,
+      maxFeePerGas: parseGwei('20'),
+      maxPriorityFeePerGas: parseGwei('1'),
+    }
+  }
+
   function handleApprove() {
     if (!amountIn || !address) return
     actionRef.current = 'approve'
+    pendingSwapRef.current = buildSwapArgs()
       writeContract({
         address: tokenIn,
         abi: ERC20_ABI,
@@ -144,18 +171,7 @@ export default function SwapView() {
   function handleSwap() {
     if (!amountIn) return
     actionRef.current = 'swap'
-    const parsedRate = parseUnits(rate, 18)
-
-      writeContract({
-        address: ANCHOR_FX_ROUTER_ADDRESS,
-        abi: ANCHOR_FX_ROUTER_ABI,
-        functionName: 'swapFX',
-        args: [tokenIn, tokenOut, parsedAmount, minOutParsed, parsedRate],
-        gas: 300000n,
-        maxFeePerGas: parseGwei('20'),
-        maxPriorityFeePerGas: parseGwei('1'),
-      })
-
+      writeContract(buildSwapArgs())
     notify('Swap Submitted', `${amountIn} ${inSymbol} → ~${amountOut} ${outSymbol}`, 'info')
   }
 
@@ -164,6 +180,7 @@ export default function SwapView() {
     setTokenOutSel(tokenInSel)
     setAmountIn('')
     setApproveConfirmed(false)
+    pendingSwapRef.current = null
   }
 
   if (!address) {
@@ -209,7 +226,7 @@ export default function SwapView() {
                 type="number"
                 placeholder="0.0"
                 value={amountIn}
-                onChange={e => setAmountIn(e.target.value)}
+                onChange={e => { setAmountIn(e.target.value); pendingSwapRef.current = null }}
                 style={{ flex: 1 }}
               />
               <TokenSelect
