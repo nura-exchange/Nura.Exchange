@@ -13,11 +13,13 @@ import SwapView from './components/views/SwapView'
 import BridgeView from './components/views/BridgeView'
 import AgentsView from './components/views/AgentsView'
 import NewsView from './components/views/NewsView'
+import GatewayView from './components/views/GatewayView'
 import TradingViewWidget from './components/views/TradingViewWidget'
 import FinalityMonitor from './components/views/FinalityMonitor'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
 import WrongNetworkBanner from './components/WrongNetworkBanner'
+import MainnetBanner from './components/MainnetBanner'
 
 const queryClient = new QueryClient()
 
@@ -44,6 +46,7 @@ function Page() {
 
   return (
     <div className="page">
+      <MainnetBanner />
       <Navbar />
       <WrongNetworkBanner />
       <div className="page-body">
@@ -63,6 +66,7 @@ function Page() {
           {activeTab === 'Bridge' && <BridgeView />}
           {activeTab === 'Agents' && <AgentsView />}
           {activeTab === 'News' && <NewsView />}
+          {activeTab === 'Gateway' && <GatewayView />}
           {activeTab === 'Portfolio' && <PortfolioView />}
           {activeTab === 'History' && <HistoryView />}
         </ErrorBoundary>

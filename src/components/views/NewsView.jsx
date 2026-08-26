@@ -3,6 +3,30 @@ import { ANCHOR_FX_ROUTER_ADDRESS } from '../../config'
 
 const NEWS = [
   {
+    date: '2026-08-18',
+    title: 'Uniswap v4 live on Arc — hooks, pools & routing day-one',
+    body: 'Uniswap deployed its v4 stack on Arc ahead of mainnet: AMM, liquidity pools, routing, SDK/API and hooks for custom fees and institutional rules. 100+ private-mainnet builders including Aave and Curve signal day-one liquidity.',
+    tag: 'Ecosystem',
+  },
+  {
+    date: '2026-08-05',
+    title: 'Founding validators: BlackRock, Visa, Mastercard, DTCC & more',
+    body: 'Circle unveiled Arc’s founding validator cohort — BlackRock, DTCC, Galaxy, Global Payments, ICE, Mastercard, MoneyGram, SBI, Standard Chartered, Sumitomo, Visa — a network secured by the institutions building on it. Private mainnet now >100 builders.',
+    tag: 'Institutional',
+  },
+  {
+    date: '2026-08-05',
+    title: 'BlackRock BUIDL coming to Arc; DTCC tokenization on Arc in H2 2027',
+    body: 'BlackRock will deploy its USD Institutional Digital Liquidity Fund (BUIDL) on Arc for single-environment subscribe/redeem/deploy. Circle + DTCC plan DTC-custodied asset tokenization on Arc starting H2 2027.',
+    tag: 'Institutional',
+  },
+  {
+    date: '2026-08',
+    title: '500M+ testnet txns, ~3M wallets — public mainnet Sep 16',
+    body: 'Arc private mainnet is live with 500M+ testnet txns and ~3M wallets. Public mainnet opens Sep 16, 2026 — open to all users/apps, permissioned PoA validators, USDC-denominated fees, EVM-compatible. Half-billion tx milestone signals institutional validation.',
+    tag: 'Network',
+  },
+  {
     date: '2026-07',
     title: 'USDC as native gas',
     body: 'Arc uses USDC for transaction fees - predictable dollar-based costs, no volatile gas token. Native view is 18 decimals, ERC-20 view is 6 decimals, same pool.',
@@ -25,6 +49,12 @@ const NEWS = [
     title: 'Stablecoin FX',
     body: 'Native support for stablecoin FX between USDC, EURC and USYC with instant PvP settlement and predictable fees.',
     tag: 'FX',
+  },
+  {
+    date: '2026-06-30',
+    title: 'Gateway Forwarding — one-param cross-chain mint',
+    body: 'New Gateway Forwarding Service auto-handles destination-chain minting for cross-chain USDC. Enable with a single query param — no multichain infra, no destination gas handling, better UX.',
+    tag: 'Gateway',
   },
   {
     date: '2026-07',
