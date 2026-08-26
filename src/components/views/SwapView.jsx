@@ -27,6 +27,7 @@ export default function SwapView() {
   const [rate, setRate] = useState('0.924700')
   const [slippage, setSlippage] = useState(0.5)
   const [approveConfirmed, setApproveConfirmed] = useState(false)
+  const [lastTxHash, setLastTxHash] = useState(null)
   const actionRef = useRef(null)
   const pendingSwapRef = useRef(null)
   const pyth = usePythRate()
@@ -106,13 +107,15 @@ export default function SwapView() {
     }
     if (actionRef.current === 'swap') {
       if (receipt.status === 'success') {
+        const hash = receipt.transactionHash
+        setLastTxHash(hash)
         const trade = {
           time: new Date().toLocaleString(),
           type: `${inSymbol} → ${outSymbol}`,
           amount: amountIn,
           rate,
           status: 'Confirmed',
-          hash: receipt.transactionHash,
+          hash,
         }
         const existing = JSON.parse(localStorage.getItem('anchorfx_trades') || '[]')
         existing.unshift(trade)
@@ -373,7 +376,17 @@ export default function SwapView() {
             </button>
           )}
 
-          {isSuccess && actionRef.current === null && (
+          {lastTxHash && (
+            <a
+              href={`https://testnet.arcscan.app/tx/${lastTxHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'block', textAlign: 'center', marginTop: 10, fontSize: 12, color: 'var(--accent2)', textDecoration: 'underline' }}
+            >
+              View transaction {lastTxHash.slice(0, 10)}…{lastTxHash.slice(-6)} on ArcScan ↗
+            </a>
+          )}
+          {isSuccess && actionRef.current === null && !lastTxHash && (
             <p className="anchor-msg success">Transaction confirmed on Arc!</p>
           )}
           {error && (
