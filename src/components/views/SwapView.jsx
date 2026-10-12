@@ -25,6 +25,22 @@ function fmt(n, d = 4) {
   return n.toFixed(6)
 }
 
+// A route is only signable when it stays on the chain we pay from and never
+// sends more than the amount entered — the same checks Quoro runs server-side.
+function relayRouteOk(q, chainId, amountWei) {
+  const d = q?.steps?.[0]?.items?.[0]?.data
+  if (!d?.to || !q.toAmount || q.toAmount === '0') return false
+  if (d.chainId != null && Number(d.chainId) !== chainId) return false
+  try { return BigInt(d.value || '0') <= amountWei } catch { return false }
+}
+
+function lifiRouteOk(q, chainId, amountWei) {
+  const tx = q?.transactionRequest
+  if (!tx?.to || !q?.estimate?.toAmount) return false
+  if (tx.chainId != null && Number(tx.chainId) !== chainId) return false
+  try { return BigInt(tx.value || '0') <= amountWei } catch { return false }
+}
+
 export default function SwapView() {
   const { address, isConnected, connector } = useAccount()
   const { notify, swapPrefill, setSwapPrefill } = useAppState()
@@ -39,8 +55,8 @@ export default function SwapView() {
   const [toPickerOpen, setToPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [amountIn, setAmountIn] = useState('')
-  const [quote, setQuote] = useState(null) // LI.FI quote (local or cross-chain fallback)
-  const [relayQuote, setRelayQuote] = useState(null) // Relay quote (cross-chain)
+  const [quote, setQuote] = useState(null) // LI.FI quote (local router, or cross-chain race winner)
+  const [relayQuote, setRelayQuote] = useState(null) // Relay quote (cross-chain race winner)
   const [quoting, setQuoting] = useState(false)
   const [quoteErr, setQuoteErr] = useState(null)
   const [lastResult, setLastResult] = useState(null) // { url, destTxHash }
@@ -118,7 +134,7 @@ export default function SwapView() {
   const tooBig = parsedIn > fromBalance.value
   const sameToken = toToken && fromToken.address.toLowerCase() === toToken.address?.toLowerCase()
 
-  // quote (debounced): local router on Robinhood Chain, Relay (with LI.FI fallback) from other chains
+  // quote (debounced): local router on Robinhood Chain; Relay vs LI.FI race from other chains
   useEffect(() => {
     setQuote(null)
     setRelayQuote(null)
@@ -142,39 +158,54 @@ export default function SwapView() {
           .catch(e => { if (id === reqId.current) setQuoteErr(quoteError(e)) })
           .finally(() => { if (id === reqId.current) setQuoting(false) })
       } else {
-        getRelayQuote({
-          user: from,
-          originChainId: payChainId,
-          destinationChainId: robinhoodChain.id,
-          originCurrency: NATIVE,
-          destinationCurrency: toToken.address,
-          amount: parsedIn.toString(),
-          tradeType: 'EXACT_INPUT',
-        })
-          .then(q => {
-            if (id === reqId.current) { setRelayQuote(q); setQuoteErr(null) }
-          })
-          .catch(err => {
-            if (id !== reqId.current) return
-            // Relay does not know every catalog token — fall back to LI.FI cross-chain routing.
-            if (err instanceof RelayError && err.code === 'unsupported_currency') {
-              return getQuote({
-                fromChain: payChainId,
-                toChain: robinhoodChain.id,
-                fromToken: NATIVE,
-                toToken: toToken.address,
-                fromAmount: parsedIn.toString(),
-                fromAddress: from,
-                slippage: SLIPPAGE,
-              })
-                .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
-                .catch(e2 => { if (id === reqId.current) setQuoteErr(quoteError(e2)) })
+        // Race Relay and LI.FI in parallel and keep the route that delivers more
+        // (Quoro's approach); a failure on one side hands the win to the other.
+        ;(async () => {
+          const [relayRes, lifiRes] = await Promise.allSettled([
+            getRelayQuote({
+              user: from,
+              originChainId: payChainId,
+              destinationChainId: robinhoodChain.id,
+              originCurrency: NATIVE,
+              destinationCurrency: toToken.address,
+              amount: parsedIn.toString(),
+              tradeType: 'EXACT_INPUT',
+            }),
+            getQuote({
+              fromChain: payChainId,
+              toChain: robinhoodChain.id,
+              fromToken: NATIVE,
+              toToken: toToken.address,
+              fromAmount: parsedIn.toString(),
+              fromAddress: from,
+              slippage: SLIPPAGE,
+            }),
+          ])
+          if (id !== reqId.current) return
+          const relayQ = relayRes.status === 'fulfilled' && relayRouteOk(relayRes.value, payChainId, parsedIn)
+            ? relayRes.value : null
+          const lifiQ = lifiRes.status === 'fulfilled' && lifiRouteOk(lifiRes.value, payChainId, parsedIn)
+            ? lifiRes.value : null
+          if (relayQ && lifiQ) {
+            if (BigInt(relayQ.toAmount) >= BigInt(lifiQ.estimate.toAmount)) {
+              setRelayQuote(relayQ); setQuote(null)
+            } else {
+              setQuote(lifiQ); setRelayQuote(null)
             }
-            if (id === reqId.current) {
-              setQuoteErr(err instanceof RelayError ? err.message : quoteError(err))
-            }
-          })
-          .finally(() => { if (id === reqId.current) setQuoting(false) })
+          } else if (relayQ) {
+            setRelayQuote(relayQ); setQuote(null)
+          } else if (lifiQ) {
+            setQuote(lifiQ); setRelayQuote(null)
+          } else {
+            const relayErr = relayRes.status === 'rejected' ? relayRes.reason : null
+            const lifiErr = lifiRes.status === 'rejected' ? lifiRes.reason : null
+            // "token not in Relay's registry" is not the interesting error when LI.FI also failed
+            const primary = relayErr && !(relayErr instanceof RelayError && relayErr.code === 'unsupported_currency')
+              ? relayErr : lifiErr
+            setQuoteErr(primary ? (primary instanceof RelayError ? primary.message : quoteError(primary)) : 'No route found')
+          }
+          setQuoting(false)
+        })().catch(() => { if (id === reqId.current) setQuoting(false) })
       }
     }, 550)
     return () => clearTimeout(t)
