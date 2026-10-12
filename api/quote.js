@@ -11,7 +11,11 @@ export default async function handler(req, res) {
   const q = req.query || {}
   const params = new URLSearchParams()
   for (const k of ALLOWED) if (q[k]) params.set(k, String(q[k]))
-  if (!params.get('fromAddress') && params.get('toAddress')) params.set('fromAddress', params.get('toAddress'))
+  // LI.FI rejects mixed-case addresses ("Invalid extended address") and requires fromAddress.
+  const addr = v => (typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v) ? v.toLowerCase() : null)
+  const from = addr(params.get('fromAddress')) || addr(params.get('toAddress')) || '0x0000000000000000000000000000000000000001'
+  params.set('fromAddress', from)
+  params.set('toAddress', addr(params.get('toAddress')) || from)
 
   try {
     const r = await fetch(`https://li.quest/v1/quote?${params.toString()}`, {
