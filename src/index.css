@@ -246,6 +246,21 @@ button { font-family: inherit; }
   max-width: 640px;
 }
 
+.subheading {
+  font-family: var(--font-display);
+  font-size: var(--text-subheading);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--leading-subheading);
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+}
+
+.chain-head {
+  margin-top: 96px;
+  padding-top: 64px;
+  border-top: 1px solid var(--line);
+}
+
 /* ---------------- Navigation ---------------- */
 
 .nav-header {
@@ -1537,6 +1552,7 @@ button { font-family: inherit; }
   .news-row { grid-template-columns: 1fr; gap: 10px; }
   .ft-inner { grid-template-columns: 1fr; }
   .view { padding-top: 40px; }
+  .chain-head { margin-top: 64px; padding-top: 48px; }
   .picker-menu { width: min(320px, calc(100vw - 60px)); }
   .search-input { width: 100%; }
 

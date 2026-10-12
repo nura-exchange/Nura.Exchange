@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAccount } from 'wagmi'
 import { useAppState } from '../../context/useAppState'
-import { useStocks, useEthPrice, USDG, ETH_TOKEN } from '../../hooks/useMarkets'
+import { useStocks, useEthPrice, useChainTokens, USDG, ETH_TOKEN } from '../../hooks/useMarkets'
 import { useTokenBalance, useNativeBalance } from '../../hooks/useTokenBalance'
 import { USDG_ADDRESS, robinhoodChain } from '../../config'
 import { getQuote, executeQuote, quoteError, remember, parseUnits, formatUnits, txUrl } from '../../lib/trade'
@@ -19,6 +19,7 @@ export default function SwapView() {
   const { address, isConnected, connector } = useAccount()
   const { notify, swapPrefill, setSwapPrefill } = useAppState()
   const { stocks } = useStocks()
+  const { chainTokens } = useChainTokens()
   const ethPrice = useEthPrice()
 
   const [fromSel, setFromSel] = useState('ETH')
@@ -166,13 +167,17 @@ export default function SwapView() {
       spark: [],
     }))
     const st = stocks.map(s => ({ ...s, symbol: s.symbol || s.ticker, address: s.ca, decimals: 18 }))
-    const all = [...core.filter(c => c.address.toLowerCase() !== fromToken.address.toLowerCase()), ...st]
+    const seen = new Set(st.map(t => t.address.toLowerCase()))
+    const ct = chainTokens
+      .filter(t => t.ca && !seen.has(t.ca.toLowerCase()))
+      .map(t => ({ ...t, ticker: t.symbol, address: t.ca, spark: [] }))
+    const all = [...core.filter(c => c.address.toLowerCase() !== fromToken.address.toLowerCase()), ...st, ...ct]
     const q = pickerQuery.trim().toLowerCase()
     if (!q) return all
     return all.filter(t =>
       (t.symbol || t.ticker || '').toLowerCase().includes(q) || (t.name || '').toLowerCase().includes(q)
     )
-  }, [stocks, ethPrice, fromToken, pickerQuery])
+  }, [stocks, chainTokens, ethPrice, fromToken, pickerQuery])
 
   return (
     <div className="container view split">

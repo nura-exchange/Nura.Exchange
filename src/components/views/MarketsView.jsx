@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react'
 import { useAppState } from '../../context/useAppState'
-import { useStocks, useEthPrice } from '../../hooks/useMarkets'
+import { useStocks, useEthPrice, useChainTokens } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
 
 function fmtPrice(n) {
   if (n === null || n === undefined) return '—'
   if (n >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 1 })
   if (n >= 1) return n.toFixed(2)
-  return n.toFixed(4)
+  if (n === 0) return '0'
+  return n.toLocaleString('en-US', { maximumSignificantDigits: 3 })
+}
+
+function fmtVol(v) {
+  if (!v) return '—'
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`
+  return `$${v.toFixed(0)}`
 }
 
 function Spark({ data }) {
@@ -32,6 +41,7 @@ function Spark({ data }) {
 export default function MarketsView() {
   const { setActiveTab, setSwapPrefill } = useAppState()
   const { stocks, loading } = useStocks()
+  const { chainTokens, loading: chainLoading } = useChainTokens()
   const ethPrice = useEthPrice()
   const [filter, setFilter] = useState('')
   const [updated, setUpdated] = useState(null)
@@ -47,8 +57,13 @@ export default function MarketsView() {
   const gainers = stocks.filter(s => (s.change24h ?? 0) > 0).length
   const losers = stocks.filter(s => (s.change24h ?? 0) < 0).length
 
+  const stockCas = new Set(stocks.map(s => (s.ca || '').toLowerCase()))
+  const chainRows = chainTokens
+    .filter(t => !stockCas.has((t.ca || '').toLowerCase()))
+    .filter(t => !filter || t.symbol.toLowerCase().includes(filter.toLowerCase()) || t.name.toLowerCase().includes(filter.toLowerCase()))
+
   function trade(tok) {
-    setSwapPrefill({ to: { ...tok, symbol: tok.symbol || tok.ticker, address: tok.ca || tok.address, decimals: 18 } })
+    setSwapPrefill({ to: { ...tok, symbol: tok.symbol || tok.ticker, address: tok.ca || tok.address, decimals: tok.decimals || 18 } })
     setActiveTab('Swap')
   }
 
@@ -113,6 +128,56 @@ export default function MarketsView() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {!chainLoading && chainRows.length > 0 && (
+        <>
+          <div className="view-head reveal chain-head">
+            <div>
+              <h2 className="subheading">Chain</h2>
+              <p className="section-note">
+                {chainRows.length} more live markets on Robinhood Chain — every pool, ranked by 24h volume.
+              </p>
+            </div>
+          </div>
+          <div className="table-wrap reveal">
+            <table className="editorial-table">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th className="hide-sm">Name</th>
+                  <th className="num">Price</th>
+                  <th className="num">24h</th>
+                  <th className="num hide-sm">Vol 24h</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {chainRows.map((t, i) => (
+                  <tr key={t.ca} style={{ '--i': Math.min(i, 12) }}>
+                    <td>
+                      <span className="ticker-cell">
+                        {t.logo
+                          ? <img src={t.logo} alt="" className="tok-logo" loading="lazy" />
+                          : <span className="tok-logo tok-logo-fallback">{t.symbol.slice(0, 2)}</span>}
+                        <strong>{t.symbol}</strong>
+                      </span>
+                    </td>
+                    <td className="hide-sm muted">{t.name}</td>
+                    <td className="num mono">{fmtPrice(t.priceUsd)}</td>
+                    <td className={`num mono ${t.change24h > 0 ? 'up' : t.change24h < 0 ? 'down' : ''}`}>
+                      {t.change24h == null ? '—' : `${t.change24h > 0 ? '+' : ''}${t.change24h.toFixed(2)}%`}
+                    </td>
+                    <td className="num mono hide-sm dim">{fmtVol(t.vol24h)}</td>
+                    <td className="num">
+                      <button type="button" className="pill pill-ghost xs" onClick={() => trade(t)}>Trade</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )

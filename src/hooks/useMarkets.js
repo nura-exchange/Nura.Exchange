@@ -41,6 +41,39 @@ export function useStocks() {
   return { stocks, loading }
 }
 
+// Every other live market on Robinhood Chain (top pools by 24h volume via /api/tokens),
+// cached once per session so Markets and Swap share one request.
+let chainTokensPromise = null
+function loadChainTokens() {
+  if (!chainTokensPromise) {
+    chainTokensPromise = fetch('/api/tokens')
+      .then(r => r.json())
+      .then(d => (Array.isArray(d?.tokens) ? d.tokens : []))
+      .catch(() => {
+        chainTokensPromise = null
+        return []
+      })
+  }
+  return chainTokensPromise
+}
+
+export function useChainTokens() {
+  const [chainTokens, setChainTokens] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    loadChainTokens().then(list => {
+      if (!alive) return
+      setChainTokens(list)
+      setLoading(false)
+    })
+    return () => { alive = false }
+  }, [])
+
+  return { chainTokens, loading }
+}
+
 export function useEthPrice() {
   const [price, setPrice] = useState(null)
   useEffect(() => {
