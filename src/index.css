@@ -982,6 +982,24 @@ button { font-family: inherit; }
   gap: 10px;
 }
 
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 17px;
+  padding: 0 6px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--silver-3);
+}
+.score-badge.good { color: var(--pine-bright); border-color: var(--pine-dim); background: rgba(63, 158, 116, 0.08); }
+.score-badge.mid { color: var(--warn); border-color: rgba(217, 165, 74, 0.35); }
+.score-badge.flagged { color: var(--neg); border-color: rgba(229, 103, 91, 0.4); background: rgba(229, 103, 91, 0.08); }
+
 .tok-logo {
   width: 26px;
   height: 26px;

@@ -63,7 +63,7 @@ export default function MarketsView() {
     .filter(t => !filter || t.symbol.toLowerCase().includes(filter.toLowerCase()) || t.name.toLowerCase().includes(filter.toLowerCase()))
 
   function trade(tok) {
-    setSwapPrefill({ to: { ...tok, symbol: tok.symbol || tok.ticker, address: tok.ca || tok.address, decimals: tok.decimals || 18 } })
+    setSwapPrefill({ to: { ...tok, symbol: tok.symbol || tok.ticker, address: tok.ca || tok.address, decimals: tok.decimals ?? null } })
     setActiveTab('Swap')
   }
 
@@ -136,7 +136,7 @@ export default function MarketsView() {
             <div>
               <h2 className="subheading">Chain</h2>
               <p className="section-note">
-                {chainRows.length} more live markets on Robinhood Chain — every pool, ranked by 24h volume.
+                {chainRows.length} more live markets on Robinhood Chain — every launch and DEX pool, ranked by 24h volume. Scored by Quoro.
               </p>
             </div>
           </div>
@@ -161,6 +161,14 @@ export default function MarketsView() {
                           ? <img src={t.logo} alt="" className="tok-logo" loading="lazy" />
                           : <span className="tok-logo tok-logo-fallback">{t.symbol.slice(0, 2)}</span>}
                         <strong>{t.symbol}</strong>
+                        {t.score != null && (
+                          <span
+                            className={`score-badge ${t.flagged ? 'flagged' : t.score >= 7 ? 'good' : t.score >= 4 ? 'mid' : 'low'}`}
+                            title={`Data score from Quoro${t.flagged ? ' — flagged' : ''}`}
+                          >
+                            {t.score}
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td className="hide-sm muted">{t.name}</td>

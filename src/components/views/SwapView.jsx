@@ -56,6 +56,22 @@ export default function SwapView() {
     }
   }, [stocks, toToken])
 
+  // Quoro-sourced tokens carry no decimals — resolve them from LI.FI's token registry.
+  useEffect(() => {
+    if (!toToken?.address || toToken.decimals != null) return
+    let alive = true
+    const addr = toToken.address
+    fetch(`https://li.quest/v1/token?chain=${robinhoodChain.id}&token=${addr}`)
+      .then(r => r.json())
+      .then(d => {
+        if (alive && d?.decimals != null) {
+          setToToken(t => (t && t.address === addr ? { ...t, decimals: d.decimals } : t))
+        }
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [toToken?.address, toToken?.decimals])
+
   useEffect(() => {
     function onDocClick(e) {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) setToPickerOpen(false)
@@ -170,7 +186,7 @@ export default function SwapView() {
     const seen = new Set(st.map(t => t.address.toLowerCase()))
     const ct = chainTokens
       .filter(t => t.ca && !seen.has(t.ca.toLowerCase()))
-      .map(t => ({ ...t, ticker: t.symbol, address: t.ca, spark: [] }))
+      .map(t => ({ ...t, ticker: t.symbol, address: t.ca, decimals: t.decimals ?? null, spark: [] }))
     const all = [...core.filter(c => c.address.toLowerCase() !== fromToken.address.toLowerCase()), ...st, ...ct]
     const q = pickerQuery.trim().toLowerCase()
     if (!q) return all
