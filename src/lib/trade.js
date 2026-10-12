@@ -61,6 +61,10 @@ async function getEip1193(connector) {
   return connector.getProvider()
 }
 
+/**
+ * @param {any} provider
+ * @param {any} chain
+ */
 export async function ensureChain(provider, chain) {
   const hexId = '0x' + chain.id.toString(16)
   try {
@@ -108,6 +112,10 @@ async function waitForReceipt(chainId, hash, timeoutMs = 120000) {
 
 // Signs exactly the quote the page showed: switch chain -> approve (exact amount, if asked) -> swap.
 // onStatus({ phase, step, of, txHash }) drives the UI.
+/**
+ * @param {any} quote
+ * @param {{ connector: any, account: any, onStatus?: (s: { phase: string, step?: number, of?: number, txHash?: string, url?: string, chainId?: number }) => void }} opts
+ */
 export async function executeQuote(quote, { connector, account, onStatus = () => {} }) {
   const q = quote
   const chainId = Number(q.action?.fromChainId || q.fromChainId)

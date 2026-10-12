@@ -3,10 +3,20 @@ import { useAccount } from 'wagmi'
 import { useAppState } from '../../context/useAppState'
 import { useStocks, useEthPrice, useChainTokens, USDG, ETH_TOKEN } from '../../hooks/useMarkets'
 import { useTokenBalance, useNativeBalance } from '../../hooks/useTokenBalance'
-import { USDG_ADDRESS, robinhoodChain } from '../../config'
-import { getQuote, executeQuote, quoteError, remember, parseUnits, formatUnits, txUrl } from '../../lib/trade'
+import { useExecuteSwap } from '../../hooks/useExecuteSwap'
+import { USDG_ADDRESS, robinhoodChain, NATIVE } from '../../config'
+import { getQuote, quoteError, remember, parseUnits, formatUnits, txUrl } from '../../lib/trade'
+import { getRelayQuote, RelayError } from '../../services/relay'
 
 const SLIPPAGE = 1
+
+const PAY_CHAINS = [
+  { id: robinhoodChain.id, name: 'Robinhood Chain', short: 'Robinhood' },
+  { id: 8453, name: 'Base', short: 'Base' },
+  { id: 42161, name: 'Arbitrum', short: 'Arbitrum' },
+  { id: 1, name: 'Ethereum', short: 'Ethereum' },
+  { id: 10, name: 'Optimism', short: 'Optimism' },
+]
 
 function fmt(n, d = 4) {
   if (n === null || n === undefined || Number.isNaN(n)) return '—'
@@ -23,20 +33,30 @@ export default function SwapView() {
   const ethPrice = useEthPrice()
 
   const [fromSel, setFromSel] = useState('ETH')
+  const [payChainId, setPayChainId] = useState(robinhoodChain.id)
+  const [chainMenuOpen, setChainMenuOpen] = useState(false)
   const [toToken, setToToken] = useState(null) // token object
   const [toPickerOpen, setToPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [amountIn, setAmountIn] = useState('')
-  const [quote, setQuote] = useState(null)
+  const [quote, setQuote] = useState(null) // LI.FI quote (local or cross-chain fallback)
+  const [relayQuote, setRelayQuote] = useState(null) // Relay quote (cross-chain)
   const [quoting, setQuoting] = useState(false)
   const [quoteErr, setQuoteErr] = useState(null)
-  const [phase, setPhase] = useState(null) // null | 'switch' | 'approve' | 'sign' | 'pending' | 'done'
-  const [lastHash, setLastHash] = useState(null)
+  const [lastResult, setLastResult] = useState(null) // { url, destTxHash }
   const pickerRef = useRef(null)
+  const chainRef = useRef(null)
   const reqId = useRef(0)
+  const executingRef = useRef(false)
+
+  const { execute, status: swapStatus, busy: swapBusy, reset: resetSwap } = useExecuteSwap()
+  const phase = swapStatus?.phase ?? null
+
+  const isCrossChain = payChainId !== robinhoodChain.id
+  const payChain = PAY_CHAINS.find(c => c.id === payChainId)
 
   const fromToken = fromSel === 'ETH' ? ETH_TOKEN : USDG
-  const nativeBal = useNativeBalance()
+  const nativeBal = useNativeBalance(payChainId)
   const usdgBal = useTokenBalance(USDG_ADDRESS, 6)
   const fromBalance = fromSel === 'ETH' ? nativeBal : usdgBal
 
@@ -46,6 +66,7 @@ export default function SwapView() {
       setToToken(swapPrefill.to)
       setSwapPrefill(null)
       setQuote(null)
+      setRelayQuote(null)
     }
   }, [swapPrefill, setSwapPrefill])
 
@@ -75,10 +96,16 @@ export default function SwapView() {
   useEffect(() => {
     function onDocClick(e) {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) setToPickerOpen(false)
+      if (chainRef.current && !chainRef.current.contains(e.target)) setChainMenuOpen(false)
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
+
+  // Cross-chain pays in native ETH only (USDG lives behind Robinhood Chain's address).
+  useEffect(() => {
+    if (isCrossChain && fromSel !== 'ETH') setFromSel('ETH')
+  }, [isCrossChain, fromSel])
 
   const parsedIn = useMemo(() => {
     try {
@@ -91,55 +118,97 @@ export default function SwapView() {
   const tooBig = parsedIn > fromBalance.value
   const sameToken = toToken && fromToken.address.toLowerCase() === toToken.address?.toLowerCase()
 
-  // quote (debounced)
+  // quote (debounced): local router on Robinhood Chain, Relay (with LI.FI fallback) from other chains
   useEffect(() => {
     setQuote(null)
+    setRelayQuote(null)
     setQuoteErr(null)
     if (!toToken || parsedIn <= 0n || sameToken) return
     const id = ++reqId.current
     const from = address || '0x000000000000000000000000000000000000dEaD'
     setQuoting(true)
     const t = setTimeout(() => {
-      getQuote({
-        fromChain: robinhoodChain.id,
-        toChain: robinhoodChain.id,
-        fromToken: fromToken.address,
-        toToken: toToken.address,
-        fromAmount: parsedIn.toString(),
-        fromAddress: from,
-        slippage: SLIPPAGE,
-      })
-        .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
-        .catch(e => { if (id === reqId.current) setQuoteErr(quoteError(e)) })
-        .finally(() => { if (id === reqId.current) setQuoting(false) })
+      if (!isCrossChain) {
+        getQuote({
+          fromChain: robinhoodChain.id,
+          toChain: robinhoodChain.id,
+          fromToken: fromToken.address,
+          toToken: toToken.address,
+          fromAmount: parsedIn.toString(),
+          fromAddress: from,
+          slippage: SLIPPAGE,
+        })
+          .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
+          .catch(e => { if (id === reqId.current) setQuoteErr(quoteError(e)) })
+          .finally(() => { if (id === reqId.current) setQuoting(false) })
+      } else {
+        getRelayQuote({
+          user: from,
+          originChainId: payChainId,
+          destinationChainId: robinhoodChain.id,
+          originCurrency: NATIVE,
+          destinationCurrency: toToken.address,
+          amount: parsedIn.toString(),
+          tradeType: 'EXACT_INPUT',
+        })
+          .then(q => {
+            if (id === reqId.current) { setRelayQuote(q); setQuoteErr(null) }
+          })
+          .catch(err => {
+            if (id !== reqId.current) return
+            // Relay does not know every catalog token — fall back to LI.FI cross-chain routing.
+            if (err instanceof RelayError && err.code === 'unsupported_currency') {
+              return getQuote({
+                fromChain: payChainId,
+                toChain: robinhoodChain.id,
+                fromToken: NATIVE,
+                toToken: toToken.address,
+                fromAmount: parsedIn.toString(),
+                fromAddress: from,
+                slippage: SLIPPAGE,
+              })
+                .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
+                .catch(e2 => { if (id === reqId.current) setQuoteErr(quoteError(e2)) })
+            }
+            if (id === reqId.current) {
+              setQuoteErr(err instanceof RelayError ? err.message : quoteError(err))
+            }
+          })
+          .finally(() => { if (id === reqId.current) setQuoting(false) })
+      }
     }, 550)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amountIn, toToken, fromToken, address, sameToken])
+  }, [amountIn, toToken, fromToken, address, sameToken, payChainId, isCrossChain])
 
-  const outAmount = quote?.estimate?.toAmount ? formatUnits(BigInt(quote.estimate.toAmount), toToken?.decimals ?? 18) : null
-  const minAmount = quote?.estimate?.toAmountMin ? formatUnits(BigInt(quote.estimate.toAmountMin), toToken?.decimals ?? 18) : null
+  const hasQuote = !!(relayQuote || quote)
+  const outAmount = relayQuote
+    ? formatUnits(BigInt(relayQuote.toAmount), relayQuote.toDecimals)
+    : quote?.estimate?.toAmount
+      ? formatUnits(BigInt(quote.estimate.toAmount), toToken?.decimals ?? 18)
+      : null
+  const minAmount = quote?.estimate?.toAmountMin
+    ? formatUnits(BigInt(quote.estimate.toAmountMin), toToken?.decimals ?? 18)
+    : null
   const gasUsd = quote?.estimate?.gasCosts?.find(g => g.amountUSD)?.amountUSD
-  const routeTool = quote?.toolDetails?.name || quote?.tool
-  const impact = quote?.estimate?.priceImpact ?? quote?.impact ?? null
+  const feeUsd = relayQuote?.feeUsd ?? (gasUsd ? parseFloat(gasUsd) : null)
+  const impact = relayQuote
+    ? relayQuote.priceImpact
+    : quote?.estimate?.priceImpact ?? quote?.impact ?? null
+  const routeLabel = relayQuote
+    ? 'Relay (Cross-chain 1-click)'
+    : quote?.toolDetails?.name || quote?.tool || null
 
   async function onExecute() {
     if (!isConnected || !connector || !address) {
       notify('Wallet', 'Connect your wallet first', 'error')
       return
     }
-    if (!quote || phase === 'switch' || phase === 'approve' || phase === 'sign' || phase === 'pending') return
-    setPhase('switch')
-    setLastHash(null)
+    if (executingRef.current || swapBusy || quoting || !hasQuote || tooBig || parsedIn <= 0n || sameToken) return
+    executingRef.current = true
+    setLastResult(null)
     try {
-      const hash = await executeQuote(quote, {
-        connector,
-        account: address,
-        onStatus: (s) => {
-          setPhase(s.phase)
-          if (s.txHash) setLastHash(s.txHash)
-        },
-      })
+      const res = await execute({ originChainId: payChainId, quote, relayQuote })
       remember(address, {
         ts: Date.now(),
         side: 'swap',
@@ -150,28 +219,37 @@ export default function SwapView() {
         amountIn,
         out: outAmount ? fmt(parseFloat(outAmount), 6) : null,
         outSymbol: toToken.symbol,
-        txHash: hash,
-        url: txUrl(hash),
+        txHash: res.txHash,
+        url: res.url,
         status: 'done',
       })
-      notify('Swap Confirmed', `${amountIn} ${fromToken.symbol} → ~${outAmount ? fmt(parseFloat(outAmount), 6) : '?'} ${toToken.symbol}`, 'success')
+      const outText = outAmount ? fmt(parseFloat(outAmount), 6) : '?'
+      if (res.destTxHash) {
+        notify('Swap Delivered', `${amountIn} ${fromToken.symbol} → ${outText} ${toToken.symbol} on Robinhood Chain`, 'success')
+      } else {
+        notify('Swap Confirmed', `${amountIn} ${fromToken.symbol} → ~${outText} ${toToken.symbol}`, 'success')
+      }
+      setLastResult({ url: res.url, destTxHash: res.destTxHash ? txUrl(res.destTxHash) : null })
       setAmountIn('')
       setQuote(null)
+      setRelayQuote(null)
       window.dispatchEvent(new Event('nura:refresh'))
     } catch (e) {
-      notify('Swap Failed', quoteError(e), 'error')
+      notify('Swap Failed', e instanceof RelayError ? e.message : quoteError(e), 'error')
     } finally {
-      setPhase(null)
+      executingRef.current = false
+      resetSwap()
     }
   }
 
-  const busy = ['switch', 'approve', 'sign', 'pending'].includes(phase)
+  const busy = swapBusy || ['switch', 'approve', 'sign', 'pending', 'delivering'].includes(phase)
   const phaseLabel = {
     switch: 'Switching network…',
     approve: 'Approving token…',
     sign: 'Confirm in wallet…',
     pending: 'Confirming…',
-    done: 'Confirmed',
+    delivering: swapStatus?.relayStatus === 'submitted' ? 'Delivering on Robinhood Chain…' : 'Bridging to Robinhood Chain…',
+    done: 'Delivered',
   }[phase] || null
 
   const toList = useMemo(() => {
@@ -201,10 +279,10 @@ export default function SwapView() {
         <h1 className="section-heading">Swap</h1>
         <p className="section-note">
           Tokenized stocks, stables and crypto — routed through LI.FI across Robinhood Chain liquidity.
-          You sign every transaction yourself.
+          Pay from Base, Arbitrum, Ethereum or Optimism and Relay delivers in one click.
         </p>
         <ul className="split-meta">
-          <li><span>Routing</span><span>LI.FI · best price</span></li>
+          <li><span>Routing</span><span>{isCrossChain ? 'Relay · cross-chain 1-click' : 'LI.FI · best price'}</span></li>
           <li><span>Custody</span><span>Self — your keys only</span></li>
           <li><span>Slippage</span><span>{SLIPPAGE}%</span></li>
         </ul>
@@ -214,8 +292,8 @@ export default function SwapView() {
       <div className="trade-card">
         <div className="field">
           <div className="field-top">
-            <span className="label">You pay</span>
-            <span className="balance-line">Balance: {fmt(fromBalance.balance, 4)} {fromToken.symbol}</span>
+            <span className="label">You pay{isCrossChain ? ` — from ${payChain?.name}` : ''}</span>
+            <span className="balance-line">Balance: {fmt(fromBalance.balance, 4)} {fromToken.symbol}{isCrossChain ? ` · ${payChain?.short}` : ''}</span>
           </div>
           <div className="field-row">
             <input
@@ -226,29 +304,57 @@ export default function SwapView() {
               onChange={e => setAmountIn(e.target.value.replace(/[^0-9.]/g, ''))}
             />
             <div className="token-pills">
+              <div className="token-picker" ref={chainRef}>
+                <button
+                  type="button"
+                  className="pill token-pill"
+                  onClick={() => setChainMenuOpen(o => !o)}
+                >
+                  {payChain?.short || 'Chain'}
+                  <span className="chev">▾</span>
+                </button>
+                {chainMenuOpen && (
+                  <div className="picker-menu chain-menu">
+                    <div className="picker-list">
+                      {PAY_CHAINS.map(c => (
+                        <button
+                          type="button"
+                          key={c.id}
+                          className={`picker-item ${payChainId === c.id ? 'active' : ''}`}
+                          onClick={() => { setPayChainId(c.id); setChainMenuOpen(false); setQuote(null); setRelayQuote(null) }}
+                        >
+                          <span className="picker-sym">{c.short}</span>
+                          <span className="picker-name">{c.id === robinhoodChain.id ? 'Swap locally' : 'Cross-chain via Relay'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               {['ETH', 'USDG'].map(sym => (
                 <button
                   key={sym}
                   type="button"
                   className={`pill token-pill ${fromSel === sym ? 'active' : ''}`}
-                  onClick={() => { setFromSel(sym); setQuote(null) }}
+                  disabled={isCrossChain && sym !== 'ETH'}
+                  onClick={() => { setFromSel(sym); setQuote(null); setRelayQuote(null) }}
                 >
                   {sym}
                 </button>
               ))}
             </div>
           </div>
-          {tooBig && <div className="field-note">Insufficient {fromToken.symbol} balance</div>}
+          {tooBig && <div className="field-note">Insufficient {fromToken.symbol} balance{isCrossChain ? ` on ${payChain?.name}` : ''}</div>}
         </div>
 
         <div className="swap-arrow" aria-hidden="true">↓</div>
 
         <div className="field">
           <div className="field-top">
-            <span className="label">You receive</span>
+            <span className="label">You receive — on Robinhood Chain</span>
           </div>
           <div className="field-row">
-            <div className="amount-output">{quote ? fmt(parseFloat(outAmount || '0'), 6) : <span className="dim">—</span>}</div>
+            <div className="amount-output">{hasQuote ? fmt(parseFloat(outAmount || '0'), 6) : <span className="dim">—</span>}</div>
             <div className="token-picker" ref={pickerRef}>
               <button type="button" className="pill token-pill wide" onClick={() => setToPickerOpen(o => !o)}>
                 {toToken ? toToken.symbol : 'Select'}
@@ -269,7 +375,7 @@ export default function SwapView() {
                         type="button"
                         key={t.address}
                         className={`picker-item ${toToken?.ca === t.ca && toToken?.address === t.address ? 'active' : ''}`}
-                        onClick={() => { setToToken({ ...t, symbol: t.symbol || t.ticker, ca: t.ca || t.address }); setToPickerOpen(false); setQuote(null) }}
+                        onClick={() => { setToToken({ ...t, symbol: t.symbol || t.ticker, ca: t.ca || t.address }); setToPickerOpen(false); setQuote(null); setRelayQuote(null) }}
                       >
                         <span className="picker-sym">{t.symbol || t.ticker}</span>
                         <span className="picker-name">{t.name}</span>
@@ -282,27 +388,41 @@ export default function SwapView() {
             </div>
           </div>
           <div className="field-note">
-            {quoting && 'Finding best route…'}
+            {quoting && (isCrossChain ? 'Finding cross-chain route…' : 'Finding best route…')}
             {!quoting && quoteErr && quoteErr}
-            {!quoting && !quoteErr && quote && (
-              <>1 {fromToken.symbol} ≈ {fmt(parseFloat(outAmount || '0') / parseFloat(amountIn || '1'), 4)} {toToken?.symbol} · route: {routeTool}</>
+            {!quoting && !quoteErr && hasQuote && (
+              <>1 {fromToken.symbol} ≈ {fmt(parseFloat(outAmount || '0') / parseFloat(amountIn || '1'), 4)} {toToken?.symbol} · route: {routeLabel}</>
             )}
           </div>
         </div>
 
-        {quote && !quoteErr && (
+        {hasQuote && !quoteErr && (
           <div className="quote-lines">
-            <div className="q-line"><span>Minimum received</span><span>{fmt(parseFloat(minAmount || '0'), 6)} {toToken?.symbol}</span></div>
-            <div className="q-line"><span>Network fee</span><span>{gasUsd ? `$${fmt(parseFloat(gasUsd), 2)}` : '—'}</span></div>
-            {impact != null && <div className="q-line"><span>Price impact</span><span>{fmt(parseFloat(impact), 2)}%</span></div>}
-            <div className="q-line"><span>Slippage</span><span>{SLIPPAGE}%</span></div>
+            {relayQuote ? (
+              <>
+                <div className="q-line"><span>Route</span><span>Relay — cross-chain 1-click</span></div>
+                <div className="q-line"><span>Network + relay fee</span><span>{feeUsd != null ? `$${fmt(feeUsd, 2)}` : '—'}</span></div>
+                {impact != null && <div className="q-line"><span>Price impact</span><span>{fmt(impact, 2)}%</span></div>}
+                {relayQuote.timeEstimate != null && (
+                  <div className="q-line"><span>Est. delivery</span><span>{relayQuote.timeEstimate >= 60 ? `~${Math.ceil(relayQuote.timeEstimate / 60)} min` : `~${relayQuote.timeEstimate} sec`}</span></div>
+                )}
+                <div className="q-line"><span>Slippage</span><span>{SLIPPAGE}%</span></div>
+              </>
+            ) : (
+              <>
+                <div className="q-line"><span>Minimum received</span><span>{fmt(parseFloat(minAmount || '0'), 6)} {toToken?.symbol}</span></div>
+                <div className="q-line"><span>Network fee</span><span>{feeUsd != null ? `$${fmt(feeUsd, 2)}` : '—'}</span></div>
+                {impact != null && <div className="q-line"><span>Price impact</span><span>{fmt(parseFloat(impact), 2)}%</span></div>}
+                <div className="q-line"><span>Slippage</span><span>{SLIPPAGE}%</span></div>
+              </>
+            )}
           </div>
         )}
 
         <button
           type="button"
           className="pill pill-primary trade-cta"
-          disabled={busy || quoting || !quote || tooBig || parsedIn <= 0n || sameToken}
+          disabled={busy || quoting || !hasQuote || tooBig || parsedIn <= 0n || sameToken}
           onClick={onExecute}
         >
           {!isConnected ? 'Connect wallet to swap'
@@ -311,13 +431,19 @@ export default function SwapView() {
                 : sameToken ? 'Choose another token'
                   : tooBig ? 'Insufficient balance'
                     : quoteErr ? 'No route — try another pair'
-                      : !quote ? 'Fetching quote…'
-                        : `Swap ${fromToken.symbol} for ${toToken?.symbol}`}
+                      : !hasQuote ? 'Fetching quote…'
+                        : isCrossChain ? `Swap ${fromToken.symbol} from ${payChain?.short} for ${toToken?.symbol}`
+                          : `Swap ${fromToken.symbol} for ${toToken?.symbol}`}
         </button>
 
-        {lastHash && (
+        {lastResult?.url && (
           <div className="tx-link-row">
-            <a href={txUrl(lastHash)} target="_blank" rel="noreferrer">View transaction on Blockscout ↗</a>
+            <a href={lastResult.url} target="_blank" rel="noreferrer">
+              View {lastResult.destTxHash ? 'deposit' : 'transaction'} on explorer ↗
+            </a>
+            {lastResult.destTxHash && (
+              <> · <a href={lastResult.destTxHash} target="_blank" rel="noreferrer">View delivery ↗</a></>
+            )}
           </div>
         )}
       </div>

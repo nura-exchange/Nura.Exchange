@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount } from 'wagmi'
 import { createPublicClient, http, formatUnits } from 'viem'
 import { robinhoodChain, USDG_ADDRESS, WETH_ADDRESS, NATIVE } from '../config'
+import { publicClientFor } from '../lib/trade'
 
 const client = createPublicClient({
   chain: robinhoodChain,
@@ -68,9 +69,11 @@ export function useWethBalance() {
   return useTokenBalance(WETH_ADDRESS, 18)
 }
 
-export function useNativeBalance() {
+/** Native balance on the given chain (defaults to Robinhood Chain). */
+export function useNativeBalance(chainId = robinhoodChain.id) {
   const { address } = useAccount()
   const [value, setValue] = useState(0n)
+  const client = useMemo(() => publicClientFor(chainId), [chainId])
 
   const fetchBalance = useCallback(async () => {
     if (!address) return
@@ -80,7 +83,7 @@ export function useNativeBalance() {
     } catch {
       // ignore
     }
-  }, [address])
+  }, [address, client])
 
   useEffect(() => {
     if (!address) {
