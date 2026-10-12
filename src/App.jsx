@@ -1,6 +1,7 @@
+import { useEffect } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { RainbowKitProvider, lightTheme } from '@rainbow-me/rainbowkit'
+import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
 import { config, robinhoodChain } from './config'
 import { AppProvider, useAppState } from './context/useAppState'
@@ -41,6 +42,36 @@ function Notifications() {
 function Page() {
   const { activeTab } = useAppState()
 
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') {
+      document.querySelectorAll('.reveal').forEach(el => el.classList.add('is-visible'))
+      return
+    }
+    const io = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            io.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    )
+    const observe = el => {
+      if (el.classList && el.classList.contains('reveal') && !el.classList.contains('is-visible')) io.observe(el)
+      if (el.querySelectorAll) el.querySelectorAll('.reveal:not(.is-visible)').forEach(child => io.observe(child))
+    }
+    document.querySelectorAll('.reveal').forEach(observe)
+    const mo = new MutationObserver(muts => {
+      muts.forEach(m => m.addedNodes.forEach(node => {
+        if (node.nodeType === 1) observe(node)
+      }))
+    })
+    mo.observe(document.body, { childList: true, subtree: true })
+    return () => { io.disconnect(); mo.disconnect() }
+  }, [activeTab])
+
   return (
     <div className="page">
       <Navbar />
@@ -69,9 +100,9 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           initialChain={robinhoodChain}
-          theme={lightTheme({
-            accentColor: '#000000',
-            accentColorForeground: '#ffffff',
+          theme={darkTheme({
+            accentColor: '#ffffff',
+            accentColorForeground: '#000000',
             borderRadius: 'none',
           })}
         >

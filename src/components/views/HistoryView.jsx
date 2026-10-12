@@ -31,12 +31,12 @@ export default function HistoryView() {
 
   return (
     <div className="container view">
-      <div className="view-head">
+      <div className="view-head reveal">
         <h1 className="section-heading">History</h1>
         <p className="section-note">Your recent swaps and bridges, kept in this browser only — nothing is stored on a server.</p>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap reveal reveal-d1">
         <table className="editorial-table">
           <thead>
             <tr>

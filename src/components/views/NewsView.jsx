@@ -40,14 +40,14 @@ const ITEMS = [
 export default function NewsView() {
   return (
     <div className="container view">
-      <div className="view-head">
+      <div className="view-head reveal">
         <h1 className="section-heading">News</h1>
         <p className="section-note">What is happening on Robinhood Chain and around Nura Exchange.</p>
       </div>
 
-      <div className="news-list">
+      <div className="news-list reveal reveal-d1">
         {ITEMS.map((n, i) => (
-          <article className="news-row" key={i}>
+          <article className="news-row" key={i} style={{ '--i': i }}>
             <div className="news-meta">
               <span className="news-tag">{n.tag}</span>
               <span className="news-date">{n.date}</span>

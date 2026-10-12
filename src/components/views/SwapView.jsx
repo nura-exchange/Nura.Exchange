@@ -176,7 +176,7 @@ export default function SwapView() {
 
   return (
     <div className="container view split">
-      <aside className="split-aside">
+      <aside className="split-aside reveal">
         <h1 className="section-heading">Swap</h1>
         <p className="section-note">
           Tokenized stocks, stables and crypto — routed through LI.FI across Robinhood Chain liquidity.
@@ -189,7 +189,7 @@ export default function SwapView() {
         </ul>
       </aside>
 
-      <div className="split-main">
+      <div className="split-main reveal reveal-d1">
       <div className="trade-card">
         <div className="field">
           <div className="field-top">

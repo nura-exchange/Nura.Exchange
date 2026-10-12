@@ -54,7 +54,7 @@ export default function MarketsView() {
 
   return (
     <div className="container view">
-      <div className="view-head row">
+      <div className="view-head row reveal">
         <div>
           <h1 className="section-heading">Markets</h1>
           <p className="section-note">
@@ -73,7 +73,7 @@ export default function MarketsView() {
       {loading ? (
         <TableSkeleton />
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap reveal reveal-d1">
           <table className="editorial-table">
             <thead>
               <tr>
@@ -86,8 +86,8 @@ export default function MarketsView() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(s => (
-                <tr key={s.ca || s.ticker}>
+              {rows.map((s, i) => (
+                <tr key={s.ca || s.ticker} style={{ '--i': Math.min(i, 12) }}>
                   <td>
                     <span className="ticker-cell">
                       {s.logo

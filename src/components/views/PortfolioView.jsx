@@ -102,19 +102,19 @@ export default function PortfolioView() {
 
   return (
     <div className="container view">
-      <div className="view-head">
+      <div className="view-head reveal">
         <h1 className="section-heading">Portfolio</h1>
         <p className="section-note">
           Holdings on Robinhood Chain · {address && <a className="inline-link" href={addressUrl(address)} target="_blank" rel="noreferrer">{address.slice(0, 6)}…{address.slice(-4)} ↗</a>}
         </p>
       </div>
 
-      <div className="portfolio-total">
+      <div className="portfolio-total reveal reveal-d1">
         <span className="label">Total value</span>
         <span className="display-sm">${fmt(total, 2)}</span>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap reveal reveal-d2">
         <table className="editorial-table">
           <thead>
             <tr>

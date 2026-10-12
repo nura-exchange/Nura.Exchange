@@ -112,7 +112,7 @@ export default function BridgeView() {
 
   return (
     <div className="container view split">
-      <aside className="split-aside">
+      <aside className="split-aside reveal">
         <h1 className="section-heading">Bridge</h1>
         <p className="section-note">
           Bring funds to Robinhood Chain from {SOURCE_CHAINS.length} networks in a single signed
@@ -125,7 +125,7 @@ export default function BridgeView() {
         </ul>
       </aside>
 
-      <div className="split-main">
+      <div className="split-main reveal reveal-d1">
       <div className="trade-card">
         <div className="field">
           <div className="field-top">
