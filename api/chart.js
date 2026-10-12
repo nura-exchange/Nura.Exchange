@@ -14,13 +14,19 @@ const RANGES = {
   '1Y': { tf: 'day', agg: 1, limit: 365 },
 }
 
-async function gt(path) {
-  const r = await fetch(`${GT}${path}`, { headers: { Accept: 'application/json' } })
-  if (!r.ok) {
+// Public GT API is 30 req/min per IP — one backoff retry smooths out shared-IP 429s.
+async function gt(path, tries = 2) {
+  for (let i = 0; i < tries; i++) {
+    const r = await fetch(`${GT}${path}`, { headers: { Accept: 'application/json' } })
+    if (r.ok) return r.json()
     const body = await r.text()
+    if (r.status === 429 && i < tries - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      continue
+    }
     throw new Error(`GT ${r.status} ${body.slice(0, 160)}`)
   }
-  return r.json()
+  throw new Error('GT fetch failed')
 }
 
 export default async function handler(req, res) {
