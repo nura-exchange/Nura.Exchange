@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
@@ -40,6 +40,31 @@ function Notifications() {
   )
 }
 
+function ScrollProgress() {
+  const ref = useRef(null)
+  useEffect(() => {
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        const max = document.documentElement.scrollHeight - window.innerHeight
+        const p = max > 0 ? window.scrollY / max : 0
+        if (ref.current) ref.current.style.transform = `scaleX(${Math.min(1, p)})`
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll, { passive: true })
+    onScroll()
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
+  return <div className="scroll-progress" ref={ref} aria-hidden="true" />
+}
+
 function Page() {
   const { activeTab } = useAppState()
 
@@ -79,19 +104,22 @@ function Page() {
 
   return (
     <div className="page">
+      <ScrollProgress />
       <Navbar />
       <WrongNetworkBanner />
       <div className="page-body">
         {activeTab === 'Markets' && <Hero />}
         <ErrorBoundary>
-          {activeTab === 'Markets' && <MarketsView />}
-          {activeTab === 'Markets' && <ManifestoBand />}
-          {activeTab === 'Swap' && <SwapView />}
-          {activeTab === 'Bridge' && <BridgeView />}
-          {activeTab === 'Portfolio' && <PortfolioView />}
-          {activeTab === 'History' && <HistoryView />}
-          {activeTab === 'News' && <NewsView />}
-          {activeTab === 'Docs' && <DocsView />}
+          <div className="view-fade" key={activeTab}>
+            {activeTab === 'Markets' && <MarketsView />}
+            {activeTab === 'Markets' && <ManifestoBand />}
+            {activeTab === 'Swap' && <SwapView />}
+            {activeTab === 'Bridge' && <BridgeView />}
+            {activeTab === 'Portfolio' && <PortfolioView />}
+            {activeTab === 'History' && <HistoryView />}
+            {activeTab === 'News' && <NewsView />}
+            {activeTab === 'Docs' && <DocsView />}
+          </div>
         </ErrorBoundary>
       </div>
       <Notifications />

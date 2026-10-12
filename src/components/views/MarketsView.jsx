@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAppState } from '../../context/useAppState'
 import { useStocks, useEthPrice, useChainTokens } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
+import ChartModal from '../ChartModal'
 
 function fmtPrice(n) {
   if (n === null || n === undefined) return '—'
@@ -33,7 +34,7 @@ function Spark({ data }) {
   }).join(' ')
   return (
     <svg width={w} height={h} className="spark" aria-hidden="true">
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.2" />
+      <polyline points={pts} pathLength="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   )
 }
@@ -46,6 +47,12 @@ export default function MarketsView() {
   const [filter, setFilter] = useState('')
   const [updated, setUpdated] = useState(null)
   const [chainVisible, setChainVisible] = useState(150)
+  const [chartTok, setChartTok] = useState(null)
+
+  function openChart(e, tok) {
+    if (e.target.closest('button')) return
+    setChartTok(tok)
+  }
 
   useEffect(() => {
     if (!loading) setUpdated(new Date().toLocaleTimeString())
@@ -72,6 +79,7 @@ export default function MarketsView() {
 
   return (
     <div className="container view">
+      {chartTok && <ChartModal token={chartTok} onClose={() => setChartTok(null)} />}
       <div className="view-head row reveal">
         <div>
           <h1 className="section-heading">Markets</h1>
@@ -103,9 +111,9 @@ export default function MarketsView() {
                 <th></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody key={`stocks-${filter}`}>
               {rows.map((s, i) => (
-                <tr key={s.ca || s.ticker} style={{ '--i': Math.min(i, 12) }}>
+                <tr key={s.ca || s.ticker} className="row-link" style={{ '--i': Math.min(i, 12) }} onClick={e => openChart(e, s)}>
                   <td>
                     <span className="ticker-cell">
                       {s.logo
@@ -155,9 +163,9 @@ export default function MarketsView() {
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody key={`chain-${filter}`}>
                 {chainShown.map((t, i) => (
-                  <tr key={t.ca} style={{ '--i': Math.min(i, 12) }}>
+                  <tr key={t.ca} className="row-link" style={{ '--i': Math.min(i, 12) }} onClick={e => openChart(e, t)}>
                     <td>
                       <span className="ticker-cell">
                         {t.logo

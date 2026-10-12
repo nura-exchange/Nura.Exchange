@@ -12,6 +12,7 @@ export function useStocks() {
       logo: null,
       priceUsd: null,
       change24h: null,
+      vol24h: null,
       spark: [],
     }))
   )
@@ -30,6 +31,7 @@ export function useStocks() {
           logo: s.logo || null,
           priceUsd: s.priceUsd ?? null,
           change24h: s.change24h ?? null,
+          vol24h: s.vol24h ?? s.volume24h ?? null,
           spark: Array.isArray(s.spark) ? s.spark : [],
         })))
         setLoading(false)
