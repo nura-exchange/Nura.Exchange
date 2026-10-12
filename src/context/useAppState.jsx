@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 
-const TABS = ['Markets', 'Swap', 'Bridge', 'Gateway', 'Agents', 'News', 'Portfolio', 'History']
+const TABS = ['Markets', 'Swap', 'Bridge', 'Portfolio', 'History', 'News']
 
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
-  const [activeTab, setActiveTab] = useState('Swap')
-  const [selectedPair, setSelectedPair] = useState(null)
+  const [activeTab, setActiveTab] = useState('Markets')
+  const [swapPrefill, setSwapPrefill] = useState(null)
   const [notifications, setNotifications] = useState([])
   const notifId = useRef(0)
 
@@ -14,7 +14,7 @@ export function AppProvider({ children }) {
     const id = ++notifId.current
     const time = new Date().toLocaleTimeString()
     setNotifications(prev => [...prev, { id, title, message, type, time }])
-    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000)
+    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 7000)
   }, [])
 
   const dismissNotification = useCallback((id) => {
@@ -22,7 +22,7 @@ export function AppProvider({ children }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ activeTab, setActiveTab, selectedPair, setSelectedPair, tabs: TABS, notifications, notify, dismissNotification }}>
+    <AppContext.Provider value={{ activeTab, setActiveTab, swapPrefill, setSwapPrefill, tabs: TABS, notifications, notify, dismissNotification }}>
       {children}
     </AppContext.Provider>
   )

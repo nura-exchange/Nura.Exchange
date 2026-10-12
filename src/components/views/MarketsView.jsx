@@ -1,141 +1,119 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppState } from '../../context/useAppState'
+import { useStocks, useEthPrice } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
 
-const SYMBOLS = [
-  { pair: 'USDC/EURC', binance: null },
-  { pair: 'BTC/USD', binance: 'BTCUSDT' },
-  { pair: 'ETH/USD', binance: 'ETHUSDT' },
-  { pair: 'SOL/USD', binance: 'SOLUSDT' },
-  { pair: 'ARB/USD', binance: 'ARBUSDT' },
-  { pair: 'OP/USD', binance: 'OPUSDT' },
-]
+function fmtPrice(n) {
+  if (n === null || n === undefined) return '—'
+  if (n >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 1 })
+  if (n >= 1) return n.toFixed(2)
+  return n.toFixed(4)
+}
 
-const BINANCE_MAP = {
-  'BTC/USD': 'BINANCE:BTCUSDT',
-  'ETH/USD': 'BINANCE:ETHUSDT',
-  'SOL/USD': 'BINANCE:SOLUSDT',
-  'ARB/USD': 'BINANCE:ARBUSDT',
-  'OP/USD': 'BINANCE:OPUSDT',
-  'USDC/EURC': null,
+function Spark({ data }) {
+  if (!Array.isArray(data) || data.length < 2) return <span className="dim">—</span>
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const w = 96
+  const h = 26
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w
+    const y = h - ((v - min) / range) * (h - 2) - 1
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  return (
+    <svg width={w} height={h} className="spark" aria-hidden="true">
+      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  )
 }
 
 export default function MarketsView() {
-  const { setActiveTab, setSelectedPair } = useAppState()
-  const [prices, setPrices] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [flash, setFlash] = useState({})
-  const [lastUpdate, setLastUpdate] = useState(null)
-  const prevPrices = useRef({})
+  const { setActiveTab, setSwapPrefill } = useAppState()
+  const { stocks, loading } = useStocks()
+  const ethPrice = useEthPrice()
+  const [filter, setFilter] = useState('')
+  const [updated, setUpdated] = useState(null)
 
   useEffect(() => {
-    const symbols = SYMBOLS.filter(s => s.binance).map(s => `"${s.binance}"`).join(',')
-    if (!symbols) return
+    if (!loading) setUpdated(new Date().toLocaleTimeString())
+  }, [loading, stocks])
 
-    const fetchPrices = () => {
-      fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols}]`)
-        .then(r => r.json())
-        .then(data => {
-          const map = {}
-          const newFlash = {}
-          data.forEach(t => {
-            const price = parseFloat(t.lastPrice)
-            const prev = prevPrices.current[t.symbol]
-            if (prev && prev !== price) {
-              newFlash[t.symbol] = price > prev ? 'up' : 'down'
-            }
-            map[t.symbol] = {
-              price,
-              change: parseFloat(t.priceChangePercent),
-              volume: (parseFloat(t.quoteVolume) / 1e6).toFixed(1) + 'M',
-              high: parseFloat(t.highPrice),
-              low: parseFloat(t.lowPrice),
-            }
-            prevPrices.current[t.symbol] = price
-          })
-          setPrices(map)
-          setLastUpdate(new Date().toLocaleTimeString())
-          setLoading(false)
-          if (Object.keys(newFlash).length) {
-            setFlash(newFlash)
-            setTimeout(() => setFlash({}), 800)
-          }
-        })
-        .catch(() => {})
-    }
+  const rows = stocks
+    .filter(s => !filter || s.ticker.toLowerCase().includes(filter.toLowerCase()) || s.name.toLowerCase().includes(filter.toLowerCase()))
+    .sort((a, b) => (b.change24h ?? -Infinity) - (a.change24h ?? -Infinity))
 
-    fetchPrices()
-    const interval = setInterval(fetchPrices, 10000)
-    return () => clearInterval(interval)
-  }, [])
+  const gainers = stocks.filter(s => (s.change24h ?? 0) > 0).length
+  const losers = stocks.filter(s => (s.change24h ?? 0) < 0).length
+
+  function trade(tok) {
+    setSwapPrefill({ to: { ...tok, address: tok.ca || tok.address, decimals: 18 } })
+    setActiveTab('Swap')
+  }
 
   return (
-    <div className="view-section">
-      <div className="view-head">
-        <h2>Markets</h2>
-        <span className="view-sub">
-          Live from Binance · {lastUpdate ? `Updated ${lastUpdate}` : 'Loading...'}
-        </span>
+    <div className="container view">
+      <div className="view-head row">
+        <div>
+          <h1 className="section-heading">Markets</h1>
+          <p className="section-note">
+            {stocks.length} tokenized stocks &amp; ETFs live on Robinhood Chain · ETH {ethPrice ? `$${fmtPrice(ethPrice)}` : '—'} ·
+            {' '}{gainers} up / {losers} down · updated {updated || '…'}
+          </p>
+        </div>
+        <input
+          className="search-input"
+          placeholder="Filter by ticker…"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+        />
       </div>
-      <div className="mkt-table-wrap">
-        {loading ? (
-          <TableSkeleton rows={6} />
-        ) : (
-        <table className="mkt-table">
-          <thead>
-            <tr>
-              <th>Pair</th>
-              <th>Price</th>
-              <th>24h Change</th>
-              <th>24h High / Low</th>
-              <th>Volume</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {SYMBOLS.map(s => {
-              const p = s.binance ? prices[s.binance] : { price: 0.9247, change: 0.12, volume: '12.4M', high: 0.93, low: 0.92 }
-              if (!p) return null
-              const flashDir = flash[s.binance]
-              return (
-                <tr
-                  key={s.pair}
-                  className="mkt-row"
-                  onClick={() => {
-                    if (!BINANCE_MAP[s.pair]) {
-                      setSelectedPair(null)
-                      setActiveTab('Swap')
-                    }
-                  }}
-                  style={BINANCE_MAP[s.pair] ? { cursor: 'default' } : undefined}
-                >
-                  <td className="mkt-pair">{s.pair}</td>
-                  <td className={`mkt-price${flashDir ? ' flash-' + flashDir : ''}`}>
-                    ${p.price.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: p.price < 10 ? 6 : 2 })}
-                  </td>
-                  <td className={`mkt-chg ${p.change >= 0 ? 'up' : 'down'}`}>
-                    {p.change >= 0 ? '+' : ''}{p.change.toFixed(2)}%
-                  </td>
-                  <td className="mkt-vol" style={{ fontSize: 12 }}>
-                    {p.high ? `$${p.high.toLocaleString('en', { maximumFractionDigits: p.high < 10 ? 6 : 2 })}` : '--'}
-                    {' / '}
-                    {p.low ? `$${p.low.toLocaleString('en', { maximumFractionDigits: p.low < 10 ? 6 : 2 })}` : '--'}
-                  </td>
-                  <td className="mkt-vol">{p.volume}</td>
+
+      {loading ? (
+        <TableSkeleton />
+      ) : (
+        <div className="table-wrap">
+          <table className="editorial-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th className="hide-sm">Name</th>
+                <th className="num">Price</th>
+                <th className="num">24h</th>
+                <th className="hide-sm">Trend</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(s => (
+                <tr key={s.ca || s.ticker}>
                   <td>
-                    {BINANCE_MAP[s.pair] ? (
-                      <span className="mkt-trade-btn soon" style={{ color: 'var(--text3)', background: 'var(--s3)' }}>Soon</span>
-                    ) : (
-                      <span className="mkt-trade-btn">Trade →</span>
-                    )}
+                    <span className="ticker-cell">
+                      {s.logo
+                        ? <img src={s.logo} alt="" className="tok-logo" loading="lazy" />
+                        : <span className="tok-logo tok-logo-fallback">{s.ticker.slice(0, 2)}</span>}
+                      <strong>{s.ticker}</strong>
+                    </span>
+                  </td>
+                  <td className="hide-sm muted">{s.name}</td>
+                  <td className="num mono">{fmtPrice(s.priceUsd)}</td>
+                  <td className={`num mono ${s.change24h > 0 ? 'up' : s.change24h < 0 ? 'down' : ''}`}>
+                    {s.change24h == null ? '—' : `${s.change24h > 0 ? '+' : ''}${s.change24h.toFixed(2)}%`}
+                  </td>
+                  <td className="hide-sm"><Spark data={s.spark} /></td>
+                  <td className="num">
+                    <button type="button" className="pill pill-ghost xs" onClick={() => trade(s)}>Trade</button>
                   </td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        )}
-      </div>
+              ))}
+              {!rows.length && (
+                <tr><td colSpan={6} className="empty-cell">Nothing matches “{filter}”.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

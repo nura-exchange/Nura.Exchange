@@ -1,23 +1,19 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
-import { useUsdcBalance } from '../hooks/useUsdcBalance'
 import { useAppState } from '../context/useAppState'
+import { useNativeBalance } from '../hooks/useTokenBalance'
 
 export default function Navbar() {
   const { activeTab, setActiveTab, tabs } = useAppState()
-  const { address } = useAccount()
-  const { formatted } = useUsdcBalance()
+  const { isConnected } = useAccount()
+  const native = useNativeBalance()
 
   return (
     <header className="nav-header">
-      <div className="nav-left">
-        <img
-          src="/logo.png"
-          alt="AnchorFX"
-          style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover' }}
-        />
-        <span className="nav-badge">Arc Testnet</span>
-      </div>
+      <a className="nav-brand" href="/" onClick={e => { e.preventDefault(); setActiveTab('Markets') }}>
+        <span className="wordmark">nura</span>
+        <span className="nav-badge">Robinhood Chain</span>
+      </a>
 
       <nav className="nav-tabs">
         {tabs.map(tab => (
@@ -32,10 +28,8 @@ export default function Navbar() {
       </nav>
 
       <div className="nav-right">
-        {address && (
-          <span style={{ marginRight: 12, fontSize: 13, fontFamily: 'DM Mono, monospace', color: 'var(--text)' }}>
-            {formatted} USDC
-          </span>
+        {isConnected && native.balance > 0 && (
+          <span className="nav-balance mono">{native.formatted.slice(0, 8)} ETH</span>
         )}
         <ConnectButton showBalance={false} />
       </div>

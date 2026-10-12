@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { createPublicClient, http, formatUnits } from 'viem'
-import { arcTestnet } from '../config'
+import { robinhoodChain, USDG_ADDRESS, WETH_ADDRESS, NATIVE } from '../config'
 
 const client = createPublicClient({
-  chain: arcTestnet,
+  chain: robinhoodChain,
   transport: http('/api/rpc'),
 })
 
@@ -18,11 +18,11 @@ const BALANCE_OF_ABI = [
   },
 ]
 
-export function useTokenBalance(tokenAddress, decimals = 6) {
+export function useTokenBalance(tokenAddress, decimals = 18) {
   const { address } = useAccount()
   const [value, setValue] = useState(0n)
 
-  const fetch = useCallback(async () => {
+  const fetchBalance = useCallback(async () => {
     if (!address || !tokenAddress) return
     try {
       const data = await client.readContract({
@@ -42,20 +42,66 @@ export function useTokenBalance(tokenAddress, decimals = 6) {
       setValue(0n)
       return
     }
-    fetch()
-    const interval = setInterval(fetch, 5000)
+    fetchBalance()
+    const interval = setInterval(fetchBalance, 8000)
     return () => clearInterval(interval)
-  }, [address, tokenAddress, fetch])
+  }, [address, tokenAddress, fetchBalance])
 
   useEffect(() => {
-    const handler = () => fetch()
-    window.addEventListener('anchorfx:refresh', handler)
-    return () => window.removeEventListener('anchorfx:refresh', handler)
-  }, [fetch])
+    const handler = () => fetchBalance()
+    window.addEventListener('nura:refresh', handler)
+    return () => window.removeEventListener('nura:refresh', handler)
+  }, [fetchBalance])
 
-  if (!address) return { balance: 0, formatted: '0' }
+  if (!address) return { balance: 0, formatted: '0', value: 0n }
 
   const formatted = formatUnits(value, decimals)
   const balance = parseFloat(formatted) || 0
-  return { balance, formatted }
+  return { balance, formatted, value }
 }
+
+export function useUsdgBalance() {
+  return useTokenBalance(USDG_ADDRESS, 6)
+}
+
+export function useWethBalance() {
+  return useTokenBalance(WETH_ADDRESS, 18)
+}
+
+export function useNativeBalance() {
+  const { address } = useAccount()
+  const [value, setValue] = useState(0n)
+
+  const fetchBalance = useCallback(async () => {
+    if (!address) return
+    try {
+      const bal = await client.getBalance({ address })
+      setValue(bal)
+    } catch {
+      // ignore
+    }
+  }, [address])
+
+  useEffect(() => {
+    if (!address) {
+      setValue(0n)
+      return
+    }
+    fetchBalance()
+    const interval = setInterval(fetchBalance, 8000)
+    return () => clearInterval(interval)
+  }, [address, fetchBalance])
+
+  useEffect(() => {
+    const handler = () => fetchBalance()
+    window.addEventListener('nura:refresh', handler)
+    return () => window.removeEventListener('nura:refresh', handler)
+  }, [fetchBalance])
+
+  if (!address) return { balance: 0, formatted: '0', value: 0n }
+  const formatted = formatUnits(value, 18)
+  const balance = parseFloat(formatted) || 0
+  return { balance, formatted, value }
+}
+
+export { NATIVE }

@@ -1,108 +1,75 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
+import { getHistory } from '../../lib/trade'
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 
 export default function HistoryView() {
-  const { address } = useAccount()
-  const [trades, setTrades] = useState([])
+  const { address, isConnected } = useAccount()
+  const [items, setItems] = useState([])
 
   useEffect(() => {
-    const stored = localStorage.getItem('anchorfx_trades')
-    if (stored) setTrades(JSON.parse(stored))
-  }, [])
+    if (address) setItems(getHistory(address))
+    else setItems([])
+    const h = () => address && setItems(getHistory(address))
+    window.addEventListener('nura:refresh', h)
+    return () => window.removeEventListener('nura:refresh', h)
+  }, [address])
 
-  useEffect(() => {
-    const handler = () => {
-      const stored = localStorage.getItem('anchorfx_trades')
-      if (stored) setTrades(JSON.parse(stored))
-    }
-    window.addEventListener('storage', handler)
-    return () => window.removeEventListener('storage', handler)
-  }, [])
-
-  function clearHistory() {
-    localStorage.removeItem('anchorfx_trades')
-    setTrades([])
+  if (!isConnected) {
+    return (
+      <div className="container view">
+        <div className="view-head">
+          <h1 className="section-heading">History</h1>
+          <p className="section-note">Connect your wallet to see your swaps and bridges. History lives in this browser only.</p>
+        </div>
+      </div>
+    )
   }
 
-  const totalVolume = trades.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
-
   return (
-    <div className="view-section">
+    <div className="container view">
       <div className="view-head">
-        <h2>Trade History</h2>
-        <span className="view-sub">
-          {trades.length} trade{trades.length !== 1 ? 's' : ''}
-          {totalVolume > 0 ? ` · ${totalVolume.toFixed(2)} USDC total volume` : ''}
-        </span>
+        <h1 className="section-heading">History</h1>
+        <p className="section-note">Your recent swaps and bridges, kept in this browser only — nothing is stored on a server.</p>
       </div>
 
-      {trades.length > 0 ? (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
-            <button
-              onClick={clearHistory}
-              style={{
-                background: 'none',
-                border: '0.5px solid var(--border)',
-                color: 'var(--text3)',
-                padding: '4px 12px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 12,
-              }}
-            >Clear History</button>
-          </div>
-          <table className="mkt-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Rate</th>
-                <th>Status</th>
-                <th></th>
+      <div className="table-wrap">
+        <table className="editorial-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Action</th>
+              <th className="num">Paid</th>
+              <th className="num hide-sm">Received</th>
+              <th className="num">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => (
+              <tr key={(it.txHash || '') + i}>
+                <td className="muted">{fmtTime(it.ts)}</td>
+                <td>
+                  <span className="side-tag">{it.side === 'bridge' ? 'Bridge' : 'Swap'}</span>{' '}
+                  <strong>{it.side === 'bridge' ? it.name : `${it.inSymbol} → ${it.outSymbol}`}</strong>
+                </td>
+                <td className="num mono">{it.amountIn} {it.inSymbol}</td>
+                <td className="num mono hide-sm">{it.out != null ? `${it.out} ${it.outSymbol}` : '—'}</td>
+                <td className="num">
+                  {it.url
+                    ? <a className="inline-link" href={it.url} target="_blank" rel="noreferrer">{it.status} ↗</a>
+                    : <span className="muted">{it.status}</span>}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {trades.map((t, i) => (
-                <tr key={i}>
-                  <td className="hist-time">{t.time}</td>
-                  <td>{t.type || 'Swap'}</td>
-                  <td className="mkt-price">{t.amount} USDC</td>
-                  <td style={{ fontSize: 12, color: 'var(--text2)' }}>{t.rate || '--'}</td>
-                  <td><span className="hist-status" style={{ color: t.status === 'Confirmed' ? 'var(--green)' : 'var(--text2)' }}>{t.status}</span></td>
-                  <td>
-                    {t.hash && (
-                      <a className="mkt-trade-btn" href={`https://testnet.arcscan.app/tx/${t.hash}`} target="_blank" rel="noopener noreferrer">
-                        View ↗
-                      </a>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text3)' }}>
-          <span style={{ fontSize: 48, display: 'block', marginBottom: '0.5rem' }}>📊</span>
-          <p style={{ fontSize: 15, marginBottom: 8 }}>No swap history yet</p>
-          <p style={{ fontSize: 12 }}>Execute a swap on the Swap tab to see your history here</p>
-        </div>
-      )}
-
-      {address && (
-        <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-          <a
-            href={`https://testnet.arcscan.app/address/${address}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 12, color: 'var(--accent2)' }}
-          >
-            View all transactions on ArcScan ↗
-          </a>
-        </div>
-      )}
+            ))}
+            {!items.length && (
+              <tr><td colSpan={5} className="empty-cell">No activity yet — your swaps and bridges will appear here.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

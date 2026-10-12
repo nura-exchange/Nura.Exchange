@@ -1,458 +1,295 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi'
-import { useUsdcBalance } from '../../hooks/useUsdcBalance'
-import { useEurcBalance } from '../../hooks/useEurcBalance'
-import { useRouterLiquidity } from '../../hooks/useRouterLiquidity'
-import { usePythRate } from '../../hooks/usePythRate'
-import { useTokenBalance } from '../../hooks/useTokenBalance'
-import { parseUnits, maxUint256, formatUnits, parseGwei } from 'viem'
-import { ANCHOR_FX_ROUTER_ADDRESS, ANCHOR_FX_ROUTER_ABI, USDC_ADDRESS, EURC_ADDRESS, USYC_ADDRESS } from '../../config'
-import { ERC20_ABI } from '../../abis'
+import { useAccount } from 'wagmi'
 import { useAppState } from '../../context/useAppState'
-import TokenSelect from '../TokenSelect'
+import { useStocks, useEthPrice, USDG, ETH_TOKEN } from '../../hooks/useMarkets'
+import { useTokenBalance, useNativeBalance } from '../../hooks/useTokenBalance'
+import { USDG_ADDRESS, robinhoodChain } from '../../config'
+import { getQuote, executeQuote, quoteError, remember, parseUnits, formatUnits, txUrl } from '../../lib/trade'
 
-const SLIPPAGE_OPTIONS = [0.1, 0.5, 1, 3]
-const DEADLINE_MINUTES = 30
+const SLIPPAGE = 1
 
-const TOKENS = {
-  USDC: { address: USDC_ADDRESS, decimals: 6, label: 'USDC' },
-  EURC: { address: EURC_ADDRESS, decimals: 6, label: 'EURC' },
-  USYC: { address: USYC_ADDRESS, decimals: 6, label: 'USYC' },
+function fmt(n, d = 4) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—'
+  if (n >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  if (n >= 1) return n.toFixed(d)
+  return n.toFixed(6)
 }
 
 export default function SwapView() {
-  const { address } = useAccount()
-  const { notify } = useAppState()
+  const { address, isConnected, connector } = useAccount()
+  const { notify, swapPrefill, setSwapPrefill } = useAppState()
+  const { stocks } = useStocks()
+  const ethPrice = useEthPrice()
+
+  const [fromSel, setFromSel] = useState('ETH')
+  const [toToken, setToToken] = useState(null) // token object
+  const [toPickerOpen, setToPickerOpen] = useState(false)
+  const [pickerQuery, setPickerQuery] = useState('')
   const [amountIn, setAmountIn] = useState('')
-  const [rate, setRate] = useState('0.924700')
-  const [slippage, setSlippage] = useState(0.5)
-  const [approveConfirmed, setApproveConfirmed] = useState(false)
-  const [lastTxHash, setLastTxHash] = useState(null)
-  const actionRef = useRef(null)
-  const pendingSwapRef = useRef(null)
-  const pyth = usePythRate()
+  const [quote, setQuote] = useState(null)
+  const [quoting, setQuoting] = useState(false)
+  const [quoteErr, setQuoteErr] = useState(null)
+  const [phase, setPhase] = useState(null) // null | 'switch' | 'approve' | 'sign' | 'pending' | 'done'
+  const [lastHash, setLastHash] = useState(null)
+  const pickerRef = useRef(null)
+  const reqId = useRef(0)
 
-  const { balance: usdcBalance } = useUsdcBalance()
-  const { balance: eurcBalance } = useEurcBalance()
-  const { balance: usycBalance } = useTokenBalance(USYC_ADDRESS, 6)
-  const routerLiq = useRouterLiquidity()
-  const [depositToken, setDepositToken] = useState('EURC')
-  const [depositAmount, setDepositAmount] = useState('')
-  const [tokenInSel, setTokenInSel] = useState('USDC')
-  const [tokenOutSel, setTokenOutSel] = useState('EURC')
+  const fromToken = fromSel === 'ETH' ? ETH_TOKEN : USDG
+  const nativeBal = useNativeBalance()
+  const usdgBal = useTokenBalance(USDG_ADDRESS, 6)
+  const fromBalance = fromSel === 'ETH' ? nativeBal : usdgBal
 
-  const tokenIn = TOKENS[tokenInSel].address
-  const tokenOut = TOKENS[tokenOutSel].address
-  const inSymbol = TOKENS[tokenInSel].label
-  const outSymbol = TOKENS[tokenOutSel].label
-  const inDecimals = TOKENS[tokenInSel].decimals
-  const outDecimals = TOKENS[tokenOutSel].decimals
-  const balances = { USDC: usdcBalance, EURC: eurcBalance, USYC: usycBalance }
-  const balanceIn = balances[tokenInSel] || 0
-  const balanceOut = balances[tokenOutSel] || 0
+  // prefill from Markets
+  useEffect(() => {
+    if (swapPrefill?.to) {
+      setToToken(swapPrefill.to)
+      setSwapPrefill(null)
+      setQuote(null)
+    }
+  }, [swapPrefill, setSwapPrefill])
 
   useEffect(() => {
-    const usdIn = tokenInSel === 'EURC' ? pyth.eurUsd : 1
-    const usdOut = tokenOutSel === 'EURC' ? pyth.eurUsd : 1
-    const r = tokenInSel === tokenOutSel ? 1 : usdIn / usdOut
-    setRate(r.toFixed(6))
-  }, [tokenInSel, tokenOutSel, pyth.eurUsd])
-
-  const { data: writeResult, writeContract, isPending, isSuccess, error } = useWriteContract()
-  const { data: receipt } = useWaitForTransactionReceipt({ hash: writeResult })
-  const { data: allowance } = useReadContract({
-    address: tokenIn,
-    abi: ERC20_ABI,
-    functionName: 'allowance',
-    args: address ? [address, ANCHOR_FX_ROUTER_ADDRESS] : undefined,
-    query: { enabled: !!address },
-  })
-
-  const parsedAmount = amountIn ? parseUnits(amountIn, inDecimals) : 0n
-  const amountTooBig = parsedAmount > 0n && parseFloat(amountIn) > balanceIn
-  const allowanceOk = allowance !== undefined && parsedAmount > 0n && allowance >= parsedAmount
-  const needsApprove = !approveConfirmed && !allowanceOk
-
-  const amountOut = useMemo(() => {
-    if (!amountIn) return '0'
-    const out = parseFloat(amountIn) * parseFloat(rate)
-    const fee = out * 0.0005
-    return (out - fee).toFixed(outDecimals === 6 ? 2 : 6)
-  }, [amountIn, rate, outDecimals])
-
-  const protocolFee = useMemo(() => {
-    if (!amountIn) return '0'
-    return (parseFloat(amountIn) * 0.0005).toFixed(inDecimals === 6 ? 2 : 6)
-  }, [amountIn, inDecimals])
-
-  const minOutParsed = useMemo(() => {
-    if (!amountIn || !rate) return 0n
-    const raw = parseFloat(amountIn) * parseFloat(rate)
-    const fee = raw * 0.0005
-    const afterSlippage = (raw - fee) * (1 - slippage / 100)
-    return parseUnits(afterSlippage.toFixed(outDecimals), outDecimals)
-  }, [amountIn, rate, slippage, outDecimals])
+    if (!toToken) {
+      const aapl = stocks.find(s => s.ticker === 'AAPL') || stocks[0]
+      if (aapl) setToToken({ ...aapl, address: aapl.ca, decimals: 18 })
+    }
+  }, [stocks, toToken])
 
   useEffect(() => {
-    if (!receipt) return
-    if (actionRef.current === 'approve') {
-      if (receipt.status === 'success') {
-        setApproveConfirmed(true)
-        window.dispatchEvent(new Event('anchorfx:refresh'))
-        notify('Approval Confirmed', `${inSymbol} approved for AnchorFX Router`, 'success')
-      } else {
-        pendingSwapRef.current = null
-        notify('Approval Failed', 'Transaction reverted on-chain', 'error')
-      }
+    function onDocClick(e) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setToPickerOpen(false)
     }
-    if (actionRef.current === 'swap') {
-      if (receipt.status === 'success') {
-        const hash = receipt.transactionHash
-        setLastTxHash(hash)
-        const trade = {
-          time: new Date().toLocaleString(),
-          type: `${inSymbol} → ${outSymbol}`,
-          amount: amountIn,
-          rate,
-          status: 'Confirmed',
-          hash,
-        }
-        const existing = JSON.parse(localStorage.getItem('anchorfx_trades') || '[]')
-        existing.unshift(trade)
-        localStorage.setItem('anchorfx_trades', JSON.stringify(existing))
-        setAmountIn('')
-        window.dispatchEvent(new Event('anchorfx:refresh'))
-        notify('Swap Confirmed', `Swapped ${amountIn} ${inSymbol} → ${amountOut} ${outSymbol}`, 'success')
-      } else {
-        notify('Swap Failed', 'Transaction reverted on-chain. Check balance and try again.', 'error')
-      }
-    }
-    actionRef.current = null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receipt])
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
 
-  // Auto-fire swap right after approval confirms
+  const parsedIn = useMemo(() => {
+    try {
+      return amountIn ? parseUnits(amountIn, fromToken.decimals) : 0n
+    } catch {
+      return 0n
+    }
+  }, [amountIn, fromToken])
+
+  const tooBig = parsedIn > fromBalance.value
+  const sameToken = toToken && fromToken.address.toLowerCase() === toToken.address?.toLowerCase()
+
+  // quote (debounced)
   useEffect(() => {
-    if (approveConfirmed && pendingSwapRef.current) {
-      actionRef.current = 'swap'
-      const cfg = pendingSwapRef.current
-      pendingSwapRef.current = null
-      writeContract(cfg)
-      notify('Swap Submitted', 'Executing swap automatically…', 'info')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveConfirmed])
-
-  function buildSwapArgs() {
-    return {
-      address: ANCHOR_FX_ROUTER_ADDRESS,
-      abi: ANCHOR_FX_ROUTER_ABI,
-      functionName: 'swapFX',
-      args: [tokenIn, tokenOut, parsedAmount, minOutParsed, parseUnits(rate, 18)],
-      gas: 300000n,
-      maxFeePerGas: parseGwei('20'),
-      maxPriorityFeePerGas: parseGwei('1'),
-    }
-  }
-
-  function handleApprove() {
-    if (!amountIn || !address) return
-    actionRef.current = 'approve'
-    pendingSwapRef.current = buildSwapArgs()
-      writeContract({
-        address: tokenIn,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [ANCHOR_FX_ROUTER_ADDRESS, maxUint256],
-        gas: 200000n,
-        maxFeePerGas: parseGwei('20'),
-        maxPriorityFeePerGas: parseGwei('1'),
+    setQuote(null)
+    setQuoteErr(null)
+    if (!toToken || parsedIn <= 0n || sameToken) return
+    const id = ++reqId.current
+    const from = address || '0x000000000000000000000000000000000000dEaD'
+    setQuoting(true)
+    const t = setTimeout(() => {
+      getQuote({
+        fromChain: robinhoodChain.id,
+        toChain: robinhoodChain.id,
+        fromToken: fromToken.address,
+        toToken: toToken.address,
+        fromAmount: parsedIn.toString(),
+        fromAddress: from,
+        slippage: SLIPPAGE,
       })
-    notify('Approve Submitted', `Approving ${inSymbol} spend...`, 'info')
+        .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
+        .catch(e => { if (id === reqId.current) setQuoteErr(quoteError(e)) })
+        .finally(() => { if (id === reqId.current) setQuoting(false) })
+    }, 550)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amountIn, toToken, fromToken, address, sameToken])
+
+  const outAmount = quote?.estimate?.toAmount ? formatUnits(BigInt(quote.estimate.toAmount), toToken?.decimals ?? 18) : null
+  const minAmount = quote?.estimate?.toAmountMin ? formatUnits(BigInt(quote.estimate.toAmountMin), toToken?.decimals ?? 18) : null
+  const gasUsd = quote?.estimate?.gasCosts?.find(g => g.amountUSD)?.amountUSD
+  const routeTool = quote?.toolDetails?.name || quote?.tool
+  const impact = quote?.estimate?.priceImpact ?? quote?.impact ?? null
+
+  async function onExecute() {
+    if (!isConnected || !connector || !address) {
+      notify('Wallet', 'Connect your wallet first', 'error')
+      return
+    }
+    if (!quote || phase === 'switch' || phase === 'approve' || phase === 'sign' || phase === 'pending') return
+    setPhase('switch')
+    setLastHash(null)
+    try {
+      const hash = await executeQuote(quote, {
+        connector,
+        account: address,
+        onStatus: (s) => {
+          setPhase(s.phase)
+          if (s.txHash) setLastHash(s.txHash)
+        },
+      })
+      remember(address, {
+        ts: Date.now(),
+        side: 'swap',
+        symbol: toToken.symbol,
+        ca: toToken.address,
+        name: toToken.name || toToken.symbol,
+        inSymbol: fromToken.symbol,
+        amountIn,
+        out: outAmount ? fmt(parseFloat(outAmount), 6) : null,
+        outSymbol: toToken.symbol,
+        txHash: hash,
+        url: txUrl(hash),
+        status: 'done',
+      })
+      notify('Swap Confirmed', `${amountIn} ${fromToken.symbol} → ~${outAmount ? fmt(parseFloat(outAmount), 6) : '?'} ${toToken.symbol}`, 'success')
+      setAmountIn('')
+      setQuote(null)
+      window.dispatchEvent(new Event('nura:refresh'))
+    } catch (e) {
+      notify('Swap Failed', quoteError(e), 'error')
+    } finally {
+      setPhase(null)
+    }
   }
 
-  function handleSwap() {
-    if (!amountIn) return
-    actionRef.current = 'swap'
-      writeContract(buildSwapArgs())
-    notify('Swap Submitted', `${amountIn} ${inSymbol} → ~${amountOut} ${outSymbol}`, 'info')
-  }
+  const busy = ['switch', 'approve', 'sign', 'pending'].includes(phase)
+  const phaseLabel = {
+    switch: 'Switching network…',
+    approve: 'Approving token…',
+    sign: 'Confirm in wallet…',
+    pending: 'Confirming…',
+    done: 'Confirmed',
+  }[phase] || null
 
-  function flipDirection() {
-    setTokenInSel(tokenOutSel)
-    setTokenOutSel(tokenInSel)
-    setAmountIn('')
-    setApproveConfirmed(false)
-    pendingSwapRef.current = null
-  }
-
-  if (!address) {
-    return (
-      <div className="view-section swap-view-centered">
-        <div className="view-head">
-          <h2>Swap</h2>
-          <span className="view-sub">Instant stablecoin exchange on Arc Network</span>
-        </div>
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text3)' }}>
-          <p style={{ fontSize: 15 }}>Connect your wallet to start swapping</p>
-        </div>
-      </div>
+  const toList = useMemo(() => {
+    const core = [ETH_TOKEN, USDG].map(t => ({
+      ...t,
+      logo: t.symbol === 'USDG' ? 'https://s2.coinmarketcap.com/static/img/coins/64x64/33793.png' : null,
+      priceUsd: t.symbol === 'ETH' ? ethPrice : 1,
+      change24h: null,
+      spark: [],
+    }))
+    const st = stocks.map(s => ({ ...s, address: s.ca, decimals: 18 }))
+    const all = [...core.filter(c => c.address.toLowerCase() !== fromToken.address.toLowerCase()), ...st]
+    const q = pickerQuery.trim().toLowerCase()
+    if (!q) return all
+    return all.filter(t =>
+      (t.symbol || t.ticker || '').toLowerCase().includes(q) || (t.name || '').toLowerCase().includes(q)
     )
-  }
+  }, [stocks, ethPrice, fromToken, pickerQuery])
 
   return (
-    <div className="view-section swap-view-centered">
+    <div className="container view">
       <div className="view-head">
-        <h2>Swap</h2>
-        <span className="view-sub">USDC ↔ EURC • 0.05% fee • &lt;0.4s settlement</span>
+        <h1 className="section-heading">Swap</h1>
+        <p className="section-note">Swaps route through LI.FI across Robinhood Chain liquidity — you sign every transaction yourself.</p>
       </div>
 
-      <div className="anchor-card">
-        <div className="anchor-card-header">
-          <span className="anchor-card-label">Exchange</span>
-          <span className="anchor-settlement" style={{ color: pyth.error ? 'var(--red)' : 'var(--green)' }}>
-            {pyth.error ? '● Oracle Offline' : '● Pyth Oracle'}
-          </span>
-        </div>
-
-        <div className="anchor-swap-form">
-          <div className="anchor-input-box">
-            <div className="anchor-input-row">
-              <span className="anchor-input-label">You Pay</span>
-              <span className="anchor-balance">
-                Balance: {balanceIn.toFixed(inDecimals === 6 ? 2 : 6)} {inSymbol}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                className="anchor-input"
-                type="number"
-                placeholder="0.0"
-                value={amountIn}
-                onChange={e => { setAmountIn(e.target.value); pendingSwapRef.current = null }}
-                style={{ flex: 1 }}
-              />
-              <TokenSelect
-                value={tokenInSel}
-                tokens={Object.keys(TOKENS)}
-                onChange={e => {
-                  setTokenInSel(e)
-                  if (e === tokenOutSel) setTokenOutSel(tokenInSel)
-                  setAmountIn('')
-                  setApproveConfirmed(false)
-                }}
-              />
-              <button
-                onClick={() => setAmountIn(balanceIn > 0 ? balanceIn.toFixed(inDecimals === 6 ? 2 : 6) : '')}
-                style={{
-                  background: 'var(--s2)',
-                  border: '0.5px solid var(--border)',
-                  color: 'var(--accent)',
-                  borderRadius: 8,
-                  padding: '0 12px',
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  whiteSpace: 'nowrap',
-                }}
-              >MAX</button>
-            </div>
-            <span className="anchor-input-hint">{inSymbol} (Arc Network)</span>
+      <div className="trade-card">
+        <div className="field">
+          <div className="field-top">
+            <span className="label">You pay</span>
+            <span className="balance-line">Balance: {fmt(fromBalance.balance, 4)} {fromToken.symbol}</span>
           </div>
-
-          <button
-            onClick={flipDirection}
-            style={{
-              display: 'block',
-              margin: '0.25rem auto',
-              background: 'var(--s2)',
-              border: '0.5px solid var(--border)',
-              color: 'var(--text2)',
-              borderRadius: '50%',
-              width: 36,
-              height: 36,
-              fontSize: 16,
-              cursor: 'pointer',
-              lineHeight: '36px',
-              textAlign: 'center',
-            }}
-          >↓↑</button>
-
-          <div className="anchor-input-box" style={{ opacity: 0.9 }}>
-            <div className="anchor-input-row">
-              <span className="anchor-input-label">You Receive</span>
-              <span className="anchor-balance">
-                Balance: {balanceOut.toFixed(outDecimals === 6 ? 2 : 6)} {outSymbol}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                className="anchor-input"
-                type="text"
-                readOnly
-                value={amountOut}
-                style={{ background: 'var(--s1)', flex: 1 }}
-              />
-              <TokenSelect
-                value={tokenOutSel}
-                tokens={Object.keys(TOKENS)}
-                onChange={e => {
-                  setTokenOutSel(e)
-                  if (e === tokenInSel) setTokenInSel(tokenOutSel)
-                  setAmountIn('')
-                  setApproveConfirmed(false)
-                }}
-              />
-            </div>
-            <span className="anchor-input-hint">{outSymbol} (estimated)</span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
-            <span style={{ fontSize: 12, color: 'var(--text2)' }}>Rate</span>
-            <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text)' }}>
-              1 {inSymbol} = {rate} {outSymbol}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
-            <span style={{ fontSize: 12, color: 'var(--text2)' }}>Fee</span>
-            <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text2)' }}>
-              {protocolFee} {inSymbol} (0.05%)
-            </span>
-          </div>
-
-          <div style={{ marginTop: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: 12, color: 'var(--text2)' }}>Slippage Tolerance</span>
-              <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--accent)' }}>{slippage}%</span>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {SLIPPAGE_OPTIONS.map(s => (
+          <div className="field-row">
+            <input
+              className="amount-input"
+              inputMode="decimal"
+              placeholder="0.0"
+              value={amountIn}
+              onChange={e => setAmountIn(e.target.value.replace(/[^0-9.]/g, ''))}
+            />
+            <div className="token-pills">
+              {['ETH', 'USDG'].map(sym => (
                 <button
-                  key={s}
-                  onClick={() => setSlippage(s)}
-                  style={{
-                    flex: 1,
-                    padding: '4px 0',
-                    borderRadius: 6,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    background: slippage === s ? 'var(--accent)' : 'var(--s2)',
-                    color: slippage === s ? 'var(--bg)' : 'var(--text2)',
-                    border: slippage === s ? 'none' : '0.5px solid var(--border)',
-                    fontWeight: slippage === s ? 600 : 400,
-                  }}
-                >{s}%</button>
+                  key={sym}
+                  type="button"
+                  className={`pill token-pill ${fromSel === sym ? 'active' : ''}`}
+                  onClick={() => { setFromSel(sym); setQuote(null) }}
+                >
+                  {sym}
+                </button>
               ))}
             </div>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>Min received</span>
-            <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text3)' }}>
-              {minOutParsed > 0n ? formatUnits(minOutParsed, outDecimals) : '0'} {outSymbol}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>Deadline</span>
-            <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text3)' }}>{DEADLINE_MINUTES}m</span>
-          </div>
-
-          {amountTooBig ? (
-            <button className="anchor-swap-btn" disabled style={{ background: 'var(--s3)', color: 'var(--red)', cursor: 'not-allowed' }}>
-              Insufficient {inSymbol} Balance
-            </button>
-          ) : routerLiq[tokenOutSel] <= 0 ? (
-            <button className="anchor-swap-btn" disabled style={{ background: 'var(--s3)', color: 'var(--text3)', cursor: 'not-allowed' }}>
-              Router has no {outSymbol} — deposit via Router Liquidity
-            </button>
-          ) : needsApprove ? (
-            <button className="anchor-swap-btn" onClick={handleApprove} disabled={isPending}>
-              {isPending ? 'Approving...' : `Approve ${inSymbol}`}
-            </button>
-          ) : (
-            <button className="anchor-swap-btn" onClick={handleSwap} disabled={isPending || !amountIn}>
-              {isPending ? 'Executing...' : `Swap ${inSymbol} → ${outSymbol}`}
-            </button>
-          )}
-
-          {lastTxHash && (
-            <a
-              href={`https://testnet.arcscan.app/tx/${lastTxHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'block', textAlign: 'center', marginTop: 10, fontSize: 12, color: 'var(--accent2)', textDecoration: 'underline' }}
-            >
-              View transaction {lastTxHash.slice(0, 10)}…{lastTxHash.slice(-6)} on ArcScan ↗
-            </a>
-          )}
-          {isSuccess && actionRef.current === null && !lastTxHash && (
-            <p className="anchor-msg success">Transaction confirmed on Arc!</p>
-          )}
-          {error && (
-            <p className="anchor-msg error">{error.shortMessage || error.message}</p>
-          )}
+          {tooBig && <div className="field-note">Insufficient {fromToken.symbol} balance</div>}
         </div>
 
-        <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--s1)', borderRadius: 10, border: '0.5px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Router Liquidity</span>
-            <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'DM Mono, monospace' }}>
-              {routerLiq.usdc.toFixed(2)} USDC · {routerLiq.eurc.toFixed(2)} EURC
-            </span>
+        <div className="swap-arrow" aria-hidden="true">↓</div>
+
+        <div className="field">
+          <div className="field-top">
+            <span className="label">You receive</span>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>
-            Contract needs both tokens to execute swaps. Deposit to enable trading.
+          <div className="field-row">
+            <div className="amount-output">{quote ? fmt(parseFloat(outAmount || '0'), 6) : <span className="dim">—</span>}</div>
+            <div className="token-picker" ref={pickerRef}>
+              <button type="button" className="pill token-pill wide" onClick={() => setToPickerOpen(o => !o)}>
+                {toToken ? toToken.symbol : 'Select'}
+                <span className="chev">▾</span>
+              </button>
+              {toPickerOpen && (
+                <div className="picker-menu">
+                  <input
+                    className="picker-search"
+                    placeholder="Search ticker…"
+                    value={pickerQuery}
+                    onChange={e => setPickerQuery(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="picker-list">
+                    {toList.map(t => (
+                      <button
+                        type="button"
+                        key={t.address}
+                        className={`picker-item ${toToken?.ca === t.ca && toToken?.address === t.address ? 'active' : ''}`}
+                        onClick={() => { setToToken({ ...t, ca: t.ca || t.address }); setToPickerOpen(false); setQuote(null) }}
+                      >
+                        <span className="picker-sym">{t.symbol || t.ticker}</span>
+                        <span className="picker-name">{t.name}</span>
+                        {t.priceUsd != null && <span className="picker-price">${fmt(t.priceUsd, 2)}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-            <TokenSelect
-              value={depositToken}
-              tokens={Object.keys(TOKENS)}
-              onChange={e => { setDepositToken(e); setDepositAmount('') }}
-            />
-            <input
-              className="anchor-input"
-              type="number"
-              placeholder="Amount"
-              value={depositAmount}
-              onChange={e => setDepositAmount(e.target.value)}
-              style={{ flex: 1, padding: '6px 10px', fontSize: 12 }}
-            />
-            <button
-              onClick={() => {
-                const b = { EURC: eurcBalance, USDC: usdcBalance, USYC: usycBalance }[depositToken] || 0
-                setDepositAmount(b > 0 ? b.toFixed(6) : '')
-              }}
-              style={{
-                padding: '6px 12px', background: 'var(--s2)', border: '0.5px solid var(--border)',
-                color: 'var(--accent)', borderRadius: 6, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
-              }}
-            >MAX</button>
-            <button
-              onClick={() => {
-                const amt = parseFloat(depositAmount)
-                if (!depositAmount || amt <= 0) return
-                const addr = { EURC: EURC_ADDRESS, USDC: USDC_ADDRESS, USYC: USYC_ADDRESS }[depositToken]
-                const bal = { EURC: eurcBalance, USDC: usdcBalance, USYC: usycBalance }[depositToken] || 0
-                if (amt > bal) { notify('Deposit Failed', 'Insufficient balance', 'error'); return }
-                writeContract({
-                  address: addr,
-                  abi: ERC20_ABI,
-                  functionName: 'transfer',
-                  args: [ANCHOR_FX_ROUTER_ADDRESS, parseUnits(depositAmount, 6)],
-                  gas: 200000n,
-                  maxFeePerGas: parseGwei('20'),
-                  maxPriorityFeePerGas: parseGwei('1'),
-                })
-                notify('Deposit Submitted', `Sending ${depositAmount} ${depositToken} to router`, 'info')
-              }}
-              style={{
-                padding: '6px 14px', background: 'var(--accent2)', color: '#000',
-                border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-              }}
-            >Deposit</button>
+          <div className="field-note">
+            {quoting && 'Finding best route…'}
+            {!quoting && quoteErr && quoteErr}
+            {!quoting && !quoteErr && quote && (
+              <>1 {fromToken.symbol} ≈ {fmt(parseFloat(outAmount || '0') / parseFloat(amountIn || '1'), 4)} {toToken?.symbol} · route: {routeTool}</>
+            )}
           </div>
         </div>
+
+        {quote && !quoteErr && (
+          <div className="quote-lines">
+            <div className="q-line"><span>Minimum received</span><span>{fmt(parseFloat(minAmount || '0'), 6)} {toToken?.symbol}</span></div>
+            <div className="q-line"><span>Network fee</span><span>{gasUsd ? `$${fmt(parseFloat(gasUsd), 2)}` : '—'}</span></div>
+            {impact != null && <div className="q-line"><span>Price impact</span><span>{fmt(parseFloat(impact), 2)}%</span></div>}
+            <div className="q-line"><span>Slippage</span><span>{SLIPPAGE}%</span></div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="pill pill-primary trade-cta"
+          disabled={busy || quoting || !quote || tooBig || parsedIn <= 0n || sameToken}
+          onClick={onExecute}
+        >
+          {!isConnected ? 'Connect wallet to swap'
+            : busy ? phaseLabel
+              : !amountIn ? 'Enter an amount'
+                : sameToken ? 'Choose another token'
+                  : tooBig ? 'Insufficient balance'
+                    : quoteErr ? 'No route — try another pair'
+                      : !quote ? 'Fetching quote…'
+                        : `Swap ${fromToken.symbol} for ${toToken?.symbol}`}
+        </button>
+
+        {lastHash && (
+          <div className="tx-link-row">
+            <a href={txUrl(lastHash)} target="_blank" rel="noreferrer">View transaction on Blockscout ↗</a>
+          </div>
+        )}
       </div>
     </div>
   )

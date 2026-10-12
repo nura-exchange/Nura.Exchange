@@ -1,326 +1,217 @@
-import { useState, useEffect, useRef } from 'react'
-import {
-  useAccount,
-  useChainId,
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useBalance,
-} from 'wagmi'
-import { parseUnits, maxUint256, parseGwei } from 'viem'
-import { BRIDGE_SOURCES, ARC_BRIDGE } from '../../config'
-import { ERC20_ABI, TOKEN_MESSENGER_ABI } from '../../abis'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useAccount } from 'wagmi'
 import { useAppState } from '../../context/useAppState'
+import { SOURCE_CHAINS, robinhoodChain, NATIVE, txUrl } from '../../config'
+import { getQuote, executeQuote, quoteError, remember, parseUnits, formatUnits } from '../../lib/trade'
+
+const SLIPPAGE = 0.5
+const DEAD = '0x000000000000000000000000000000000000dEaD'
+
+function fmt(n, d = 4) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—'
+  if (n >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  if (n >= 1) return n.toFixed(d)
+  return n.toFixed(6)
+}
 
 export default function BridgeView() {
-  const { address } = useAccount()
+  const { address, isConnected, connector } = useAccount()
   const { notify } = useAppState()
-  const chainId = useChainId()
-  const [sourceKey, setSourceKey] = useState('sepolia')
-  const [destKey, setDestKey] = useState('arc')
+  const [srcKey, setSrcKey] = useState('ethereum')
   const [amount, setAmount] = useState('')
-  const [approved, setApproved] = useState(false)
-  const [switching, setSwitching] = useState(false)
-  const [lastBridgeHash, setLastBridgeHash] = useState(null)
-  const actionRef = useRef(null)
+  const [quote, setQuote] = useState(null)
+  const [quoting, setQuoting] = useState(false)
+  const [quoteErr, setQuoteErr] = useState(null)
+  const [phase, setPhase] = useState(null)
+  const [lastHash, setLastHash] = useState(null)
+  const reqId = useRef(0)
 
-  const ALL_OPTIONS = { ...BRIDGE_SOURCES, arc: ARC_BRIDGE }
-  const source = ALL_OPTIONS[sourceKey]
-  const dest = ALL_OPTIONS[destKey]
-  const isSolanaRoute = sourceKey === 'solana' || destKey === 'solana'
-
-  useEffect(() => {
-    setApproved(false)
-    setLastBridgeHash(null)
-  }, [sourceKey, destKey])
-
-  // Prevent same chain selected
-  useEffect(() => {
-    if (sourceKey === destKey) {
-      const fallback = Object.keys(ALL_OPTIONS).find(k => k !== sourceKey)
-      if (fallback) setDestKey(fallback)
-    }
-  }, [sourceKey, destKey])
-
-  const { data: usdcBal } = useBalance({
-    address,
-    chainId: source.chain.id,
-    token: sourceKey === 'solana' ? undefined : source.usdc,
-  })
-
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: source.usdc,
-    abi: ERC20_ABI,
-    functionName: 'allowance',
-    args: address ? [address, source.tokenMessenger] : undefined,
-    chainId: source.chain.id,
-    query: { enabled: !!address && !source.comingSoon },
-  })
-
-  const { data: writeResult, writeContract, isPending } = useWriteContract()
-  const { data: receipt } = useWaitForTransactionReceipt({ hash: writeResult })
-
-  const parsedAmount = amount ? parseUnits(amount, 6) : 0n
-  const allowanceOk = allowance !== undefined && parsedAmount > 0n && allowance >= parsedAmount
-  const needsApprove = !approved && !allowanceOk
-  const onRightChain = chainId === source.chain.id
+  const source = useMemo(() => SOURCE_CHAINS.find(s => s.key === srcKey) || SOURCE_CHAINS[0], [srcKey])
+  const parsed = amount ? (() => { try { return parseUnits(amount, 18) } catch { return 0n } })() : 0n
 
   useEffect(() => {
-    if (!receipt) return
-    if (actionRef.current === 'approve') {
-      if (receipt.status === 'success') {
-        setApproved(true)
-        refetchAllowance()
-        notify('Approval Confirmed', 'TokenMessenger approved for USDC', 'success')
-      } else {
-        notify('Approval Failed', 'Transaction reverted', 'error')
-      }
-    }
-    if (actionRef.current === 'bridge') {
-      if (receipt.status === 'success') {
-        setLastBridgeHash(receipt.transactionHash)
-        notify(
-          'Bridge Initiated',
-          `${amount} USDC sent via CCTP ${source.name} → ${dest.name}. Tokens arrive after attestation.`,
-          'success'
-        )
-      } else {
-        notify('Bridge Failed', 'Transaction reverted', 'error')
-      }
-    }
-    actionRef.current = null
-  }, [receipt])
+    setQuote(null)
+    setQuoteErr(null)
+    if (parsed <= 0n) return
+    const id = ++reqId.current
+    const from = address || DEAD
+    setQuoting(true)
+    const t = setTimeout(() => {
+      getQuote({
+        fromChain: source.chain.id,
+        toChain: robinhoodChain.id,
+        fromToken: NATIVE,
+        toToken: NATIVE,
+        fromAmount: parsed.toString(),
+        fromAddress: from,
+        slippage: SLIPPAGE,
+      })
+        .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
+        .catch(e => { if (id === reqId.current) setQuoteErr(quoteError(e)) })
+        .finally(() => { if (id === reqId.current) setQuoting(false) })
+    }, 550)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amount, source, address])
 
-  async function handleSwitch() {
-    const provider = window.ethereum
-    if (!provider) {
-      notify('No Wallet', 'No wallet extension detected', 'error')
+  const outAmount = quote?.estimate?.toAmount ? formatUnits(BigInt(quote.estimate.toAmount), 18) : null
+  const gasUsd = quote?.estimate?.gasCosts?.find(g => g.amountUSD)?.amountUSD
+  const bridgeFeeUsd = quote?.estimate?.feeCosts?.reduce((s, f) => s + (parseFloat(f.amountUSD) || 0), 0)
+  const routeTool = quote?.toolDetails?.name || quote?.tool
+
+  async function onBridge() {
+    if (!isConnected || !connector || !address) {
+      notify('Wallet', 'Connect your wallet first', 'error')
       return
     }
-    setSwitching(true)
-    const hexChain = '0x' + source.chain.id.toString(16)
+    if (!quote || phase) return
+    setPhase('switch')
+    setLastHash(null)
     try {
-      await provider.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: hexChain }],
+      const hash = await executeQuote(quote, {
+        connector,
+        account: address,
+        onStatus: (s) => {
+          setPhase(s.phase)
+          if (s.txHash) setLastHash(s.txHash)
+        },
       })
-      notify('Switched', `Now on ${source.name}`, 'success')
-    } catch (err) {
-      if (err?.code === 4902) {
-        try {
-          await provider.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: hexChain,
-              chainName: source.chain.name,
-              nativeCurrency: source.chain.nativeCurrency,
-              rpcUrls: [source.rpc],
-              blockExplorerUrls: source.chain.blockExplorers ? [source.chain.blockExplorers.default.url] : undefined,
-            }],
-          })
-          notify('Network Added', `Added and switched to ${source.name}`, 'success')
-        } catch (err2) {
-          notify('Switch Failed', err2?.message || 'Could not add network', 'error')
-        }
-      } else {
-        notify('Switch Failed', err?.message || 'Could not switch network', 'error')
-      }
+      remember(address, {
+        ts: Date.now(),
+        side: 'bridge',
+        symbol: 'ETH',
+        ca: null,
+        name: `${source.name} → Robinhood Chain`,
+        inSymbol: source.native,
+        amountIn: amount,
+        out: outAmount ? fmt(parseFloat(outAmount), 6) : null,
+        outSymbol: 'ETH',
+        txHash: hash,
+        url: `${source.explorer}/tx/${hash}`,
+        status: 'pending',
+      })
+      notify('Bridge Initiated', `Funds are on the way — arrival depends on the route (usually under a minute).`, 'success')
+      setAmount('')
+      setQuote(null)
+      window.dispatchEvent(new Event('nura:refresh'))
+    } catch (e) {
+      notify('Bridge Failed', quoteError(e), 'error')
     } finally {
-      setSwitching(false)
+      setPhase(null)
     }
   }
 
-  function handleApprove() {
-    if (!address || !amount) return
-    actionRef.current = 'approve'
-    writeContract({
-      address: source.usdc,
-      abi: ERC20_ABI,
-      functionName: 'approve',
-      args: [source.tokenMessenger, maxUint256],
-      chainId: source.chain.id,
-      gas: 200000n,
-      maxFeePerGas: parseGwei('20'),
-      maxPriorityFeePerGas: parseGwei('1'),
-    })
-    notify('Approve Submitted', 'Approving TokenMessenger...', 'info')
-  }
-
-  function handleBridge() {
-    if (!address || !amount) return
-    actionRef.current = 'bridge'
-    writeContract({
-      address: source.tokenMessenger,
-      abi: TOKEN_MESSENGER_ABI,
-      functionName: 'depositForBurn',
-      args: [parsedAmount, dest.domain, address, source.usdc],
-      chainId: source.chain.id,
-      gas: 300000n,
-      maxFeePerGas: parseGwei('20'),
-      maxPriorityFeePerGas: parseGwei('1'),
-    })
-    notify('Bridge Submitted', `Burning ${amount} USDC on ${source.name} → ${dest.name}`, 'info')
-  }
-
-  function flipBridge() {
-    const tmp = sourceKey
-    setSourceKey(destKey)
-    setDestKey(tmp)
-    setAmount('')
-    setApproved(false)
-    setLastBridgeHash(null)
-  }
+  const busy = ['switch', 'approve', 'sign', 'pending'].includes(phase)
+  const phaseLabel = {
+    switch: 'Switching network…',
+    approve: 'Approving…',
+    sign: 'Confirm in wallet…',
+    pending: 'Confirming…',
+    done: 'Confirmed',
+  }[phase] || null
 
   return (
-    <div className="view-section">
+    <div className="container view">
       <div className="view-head">
-        <h2>Bridge</h2>
-        <span className="view-sub">CCTP · Cross-chain USDC · Powered by Circle</span>
+        <h1 className="section-heading">Bridge</h1>
+        <p className="section-note">Bring funds to Robinhood Chain from {SOURCE_CHAINS.length} networks in a single signed transaction — routed by LI.FI.</p>
       </div>
 
-      <div className="anchor-card">
-        <div className="anchor-card-header">
-          <span className="anchor-card-label">Cross-Chain Transfer</span>
-          <span className="anchor-settlement" style={{ color: 'var(--accent2)' }}>● CCTP</span>
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6 }}>From</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {Object.entries(ALL_OPTIONS).map(([key, s]) => (
-              <button
-                key={key}
-                onClick={() => !s.comingSoon && setSourceKey(key)}
-                disabled={!!s.comingSoon}
-                title={s.comingSoon ? 'Solana support coming soon — requires Solana wallet' : undefined}
-                style={{
-                  flex: 1,
-                  minWidth: 90,
-                  padding: '8px 0',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  cursor: s.comingSoon ? 'not-allowed' : 'pointer',
-                  background: sourceKey === key ? 'var(--accent2)' : 'var(--s2)',
-                  color: sourceKey === key ? '#000' : s.comingSoon ? 'var(--text3)' : 'var(--text2)',
-                  border: 'none',
-                  fontWeight: 600,
-                  opacity: s.comingSoon ? 0.6 : 1,
-                }}
-              >
-                {s.name}{s.comingSoon ? ' · Soon' : ''}
-              </button>
-            ))}
+      <div className="trade-card">
+        <div className="field">
+          <div className="field-top">
+            <span className="label">From</span>
+            <span className="balance-line">You pay in {source.native}</span>
           </div>
-        </div>
-
-        <button
-          onClick={flipBridge}
-          style={{
-            display: 'block',
-            margin: '0 auto 12px',
-            background: 'var(--s2)',
-            border: '0.5px solid var(--border)',
-            color: 'var(--text2)',
-            borderRadius: '50%',
-            width: 32,
-            height: 32,
-            fontSize: 14,
-            cursor: 'pointer',
-          }}
-          title="Flip direction"
-        >
-          ⇅
-        </button>
-
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6 }}>To</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {Object.entries(ALL_OPTIONS).map(([key, s]) => (
-              <button
-                key={key}
-                onClick={() => !s.comingSoon && setDestKey(key)}
-                disabled={!!s.comingSoon}
-                title={s.comingSoon ? 'Solana support coming soon' : undefined}
-                style={{
-                  flex: 1,
-                  minWidth: 90,
-                  padding: '8px 0',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  cursor: s.comingSoon ? 'not-allowed' : 'pointer',
-                  background: destKey === key ? 'var(--accent2)' : 'var(--s2)',
-                  color: destKey === key ? '#000' : s.comingSoon ? 'var(--text3)' : 'var(--text2)',
-                  border: 'none',
-                  fontWeight: 600,
-                  opacity: s.comingSoon ? 0.6 : 1,
-                }}
+          <div className="field-row">
+            <input
+              className="amount-input"
+              inputMode="decimal"
+              placeholder="0.0"
+              value={amount}
+              onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+            />
+            <div className="token-picker">
+              <select
+                className="chain-select"
+                value={srcKey}
+                onChange={e => { setSrcKey(e.target.value); setQuote(null) }}
               >
-                {s.name}{s.comingSoon ? ' · Soon' : ''}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text2)' }}>USDC Balance ({source.name})</span>
-          <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace' }}>
-            {usdcBal ? parseFloat(usdcBal.formatted).toFixed(6) : '0.000000'} USDC
-          </span>
-        </div>
-
-        <input
-          className="anchor-input-sm"
-          type="number"
-          placeholder="Amount (USDC)"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          style={{ marginBottom: 10 }}
-        />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{ fontSize: 12, color: 'var(--text2)' }}>Route</span>
-          <span style={{ fontSize: 12, color: 'var(--text)', fontFamily: 'DM Mono, monospace' }}>
-            {source.name} → {dest.name} · Domain {dest.domain}
-          </span>
-        </div>
-
-        {isSolanaRoute ? (
-          <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#fca5a5', marginBottom: 4 }}>Solana support coming soon</div>
-            <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>
-              Bridging to/from Solana requires a Solana wallet (Phantom) and is being integrated. For now, use Ethereum Sepolia or Base Sepolia ↔ Arc. Track progress on the Arc docs.
+                {SOURCE_CHAINS.map(s => (
+                  <option key={s.key} value={s.key}>{s.name} ({s.native})</option>
+                ))}
+              </select>
             </div>
           </div>
-        ) : !onRightChain ? (
-          <button className="anchor-swap-btn" onClick={handleSwitch} disabled={switching}>
-            {switching ? 'Switching…' : `Switch to ${source.name}`}
-          </button>
-        ) : needsApprove ? (
-          <button className="anchor-swap-btn" onClick={handleApprove} disabled={isPending || !amount}>
-            {isPending ? 'Approving...' : `Approve USDC`}
-          </button>
-        ) : (
-          <button className="anchor-swap-btn" onClick={handleBridge} disabled={isPending || !amount}>
-            {isPending ? 'Bridging...' : `Bridge ${amount || '0'} USDC → ${dest.name}`}
-          </button>
+        </div>
+
+        <div className="swap-arrow" aria-hidden="true">↓</div>
+
+        <div className="field">
+          <div className="field-top">
+            <span className="label">To</span>
+          </div>
+          <div className="field-row">
+            <div className="amount-output">{quote ? fmt(parseFloat(outAmount || '0'), 6) : <span className="dim">—</span>}</div>
+            <span className="pill token-pill wide static">Robinhood Chain · ETH</span>
+          </div>
+          <div className="field-note">
+            {quoting && 'Finding best route…'}
+            {!quoting && quoteErr && quoteErr}
+            {!quoting && !quoteErr && quote && <>Route: {routeTool} · arrives after source-chain finality</>}
+          </div>
+        </div>
+
+        {quote && !quoteErr && (
+          <div className="quote-lines">
+            <div className="q-line"><span>Minimum received</span><span>{fmt(parseFloat(minOf(quote) || '0'), 6)} ETH</span></div>
+            <div className="q-line"><span>Network fee</span><span>{gasUsd ? `$${fmt(parseFloat(gasUsd), 2)}` : '—'}</span></div>
+            {bridgeFeeUsd > 0 && <div className="q-line"><span>Route fee</span><span>${fmt(bridgeFeeUsd, 2)}</span></div>}
+            <div className="q-line"><span>Slippage</span><span>{SLIPPAGE}%</span></div>
+          </div>
         )}
 
-        {lastBridgeHash && (
-          <a
-            href={`https://testnet.arcscan.app/tx/${lastBridgeHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ display: 'block', textAlign: 'center', marginTop: 10, fontSize: 12, color: 'var(--accent2)', textDecoration: 'underline' }}
-          >
-            View bridge tx {lastBridgeHash.slice(0, 10)}…{lastBridgeHash.slice(-6)} on ArcScan ↗
-          </a>
+        <button
+          type="button"
+          className="pill pill-primary trade-cta"
+          disabled={busy || quoting || !quote || parsed <= 0n}
+          onClick={onBridge}
+        >
+          {!isConnected ? 'Connect wallet to bridge'
+            : busy ? phaseLabel
+              : !amount ? 'Enter an amount'
+                : quoteErr ? 'No route from this chain'
+                  : !quote ? 'Fetching quote…'
+                    : `Bridge ${amount} ${source.native} to Robinhood`}
+        </button>
+
+        {lastHash && (
+          <div className="tx-link-row">
+            <a href={txUrl(lastHash)} target="_blank" rel="noreferrer">View transaction on Blockscout ↗</a>
+          </div>
         )}
 
-        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 12, lineHeight: 1.5 }}>
-          CCTP burns USDC on the source chain and mints it on the destination. Settlement completes after the
-          attestation service confirms the burn — typically under a minute on testnet. You need USDC + native gas on the source chain.
-        </p>
+        <div className="chain-grid">
+          {SOURCE_CHAINS.map(s => (
+            <button
+              key={s.key}
+              type="button"
+              className={`chain-chip ${srcKey === s.key ? 'active' : ''}`}
+              onClick={() => { setSrcKey(s.key); setQuote(null) }}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
+}
+
+function minOf(q) {
+  try {
+    return formatUnits(BigInt(q.estimate.toAmountMin), 18)
+  } catch {
+    return null
+  }
 }

@@ -1,83 +1,65 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { http } from 'wagmi'
-import { sepolia, baseSepolia } from 'viem/chains'
+import {
+  mainnet, base, arbitrum, optimism, bsc, polygon,
+  unichain, linea, zksync, scroll, blast, ink, worldchain, soneium, abstract, mode,
+} from 'viem/chains'
 
-export const arcTestnet = {
-  id: 5042002,
-  name: 'Arc Testnet',
-  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+export const robinhoodChain = {
+  id: 4663,
+  name: 'Robinhood Chain',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://arcfx-app.vercel.app/api/rpc'] },
-    public: { http: ['https://arcfx-app.vercel.app/api/rpc'] },
+    default: { http: ['/api/rpc'] },
+    public: { http: ['https://rpc.mainnet.chain.robinhood.com'] },
   },
   blockExplorers: {
-    default: { name: 'ArcScan', url: 'https://testnet.arcscan.app' },
+    default: { name: 'Blockscout', url: 'https://robinhoodchain.blockscout.com' },
   },
-  testnet: true,
+  testnet: false,
 }
 
-export const USDC_ADDRESS = '0x3600000000000000000000000000000000000000'
-export const EURC_ADDRESS = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a'
-export const USYC_ADDRESS = '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C'
+export const NATIVE = '0x0000000000000000000000000000000000000000'
+export const USDG_ADDRESS = '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168'
+export const WETH_ADDRESS = '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'
+export const EXPLORER = 'https://robinhoodchain.blockscout.com'
+export const txUrl = (hash) => `${EXPLORER}/tx/${hash}`
+export const addressUrl = (addr) => `${EXPLORER}/address/${addr}`
 
-export const ARC_CCTP_DOMAIN = 26
+// Where money can come from — Robinhood Chain first (chain list modeled on Quoro, MIT).
+const src = (key, chain, name, rpcUrl, explorer, native = 'ETH') => ({ key, chain, name, rpc: rpcUrl, explorer, native })
 
-// Source chains for CCTP bridging (USDC testnet)
-export const BRIDGE_SOURCES = {
-  sepolia: {
-    chain: sepolia,
-    name: 'Ethereum Sepolia',
-    usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
-    domain: 0,
-    rpc: 'https://rpc.ankr.com/eth_sepolia',
-  },
-  baseSepolia: {
-    chain: baseSepolia,
-    name: 'Base Sepolia',
-    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
-    domain: 6,
-    rpc: 'https://sepolia.base.org',
-  },
-  solana: {
-    chain: { id: 1399811149, name: 'Solana Devnet' },
-    name: 'Solana Devnet',
-    usdc: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
-    tokenMessenger: 'CCTP2zhJ6QJ2T2E9rF2Q3J6QJ2T2E9rF2Q3J6Q',
-    domain: 5,
-    rpc: 'https://api.devnet.solana.com',
-    comingSoon: true,
-  },
-}
+export const SOURCE_CHAINS = [
+  src('ethereum', mainnet, 'Ethereum', 'https://ethereum-rpc.publicnode.com', 'https://etherscan.io'),
+  src('base', base, 'Base', 'https://base-rpc.publicnode.com', 'https://basescan.org'),
+  src('arbitrum', arbitrum, 'Arbitrum', 'https://arbitrum-one-rpc.publicnode.com', 'https://arbiscan.io'),
+  src('optimism', optimism, 'Optimism', 'https://optimism-rpc.publicnode.com', 'https://optimistic.etherscan.io'),
+  src('bnb', bsc, 'BNB Chain', 'https://bsc-rpc.publicnode.com', 'https://bscscan.com', 'BNB'),
+  src('polygon', polygon, 'Polygon', 'https://polygon-bor-rpc.publicnode.com', 'https://polygonscan.com', 'POL'),
+  src('unichain', unichain, 'Unichain', 'https://unichain-rpc.publicnode.com', 'https://uniscan.xyz'),
+  src('linea', linea, 'Linea', 'https://linea-rpc.publicnode.com', 'https://lineascan.build'),
+  src('zksync', zksync, 'ZKsync', 'https://mainnet.era.zksync.io', 'https://explorer.zksync.io'),
+  src('scroll', scroll, 'Scroll', 'https://scroll-rpc.publicnode.com', 'https://scrollscan.com'),
+  src('blast', blast, 'Blast', 'https://blast-rpc.publicnode.com', 'https://blastscan.io'),
+  src('ink', ink, 'Ink', 'https://rpc-gel.inkonchain.com', 'https://explorer.inkonchain.com'),
+  src('worldchain', worldchain, 'World Chain', 'https://worldchain-mainnet.g.alchemy.com/public', 'https://worldscan.org'),
+  src('soneium', soneium, 'Soneium', 'https://rpc.soneium.org', 'https://soneium.blockscout.com'),
+  src('abstract', abstract, 'Abstract', 'https://api.mainnet.abs.xyz', 'https://abscan.org'),
+  src('mode', mode, 'Mode', 'https://mainnet.mode.network', 'https://modescan.io'),
+]
 
-export const ARC_BRIDGE = {
-  chain: arcTestnet,
-  name: 'Arc Testnet',
-  usdc: USDC_ADDRESS,
-  tokenMessenger: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA',
-  domain: ARC_CCTP_DOMAIN,
-  rpc: 'https://arcfx-app.vercel.app/api/rpc',
-}
-
-import { ANCHOR_FX_ROUTER_ABI } from './abis'
-
-export const ANCHOR_FX_ROUTER_ADDRESS = '0x9fd6e3907450fbaa2e18be85f8ce8400e45fb087'
-export { ANCHOR_FX_ROUTER_ABI }
+export const ALL_CHAINS = [robinhoodChain, ...SOURCE_CHAINS.map(s => s.chain)]
 
 const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID
 
-// WalletConnect needs a real projectId from cloud.reown.com to work on mobile.
-// With the dummy fallback, desktop injected wallets still work, but mobile will show a setup hint.
 const transports = {
-  [arcTestnet.id]: http('/api/rpc'),
-  [sepolia.id]: http('https://rpc.ankr.com/eth_sepolia'),
-  [baseSepolia.id]: http('https://sepolia.base.org'),
+  [robinhoodChain.id]: http('/api/rpc'),
+  ...Object.fromEntries(SOURCE_CHAINS.map(s => [s.chain.id, http(s.rpc)])),
 }
 
 export const config = getDefaultConfig({
-  appName: 'AnchorFX',
+  appName: 'Nura Exchange',
   projectId: walletConnectProjectId || '00000000000000000000000000000000',
-  chains: [arcTestnet, sepolia, baseSepolia],
+  chains: ALL_CHAINS,
   transports,
 })
