@@ -1,5 +1,8 @@
 {
   "rewrites": [],
+  "functions": {
+    "api/tokens.js": { "maxDuration": 30 }
+  },
   "headers": [
     {
       "source": "/api/(rpc|quote|balances|tokens)",

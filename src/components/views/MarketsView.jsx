@@ -45,6 +45,7 @@ export default function MarketsView() {
   const ethPrice = useEthPrice()
   const [filter, setFilter] = useState('')
   const [updated, setUpdated] = useState(null)
+  const [chainVisible, setChainVisible] = useState(150)
 
   useEffect(() => {
     if (!loading) setUpdated(new Date().toLocaleTimeString())
@@ -61,6 +62,7 @@ export default function MarketsView() {
   const chainRows = chainTokens
     .filter(t => !stockCas.has((t.ca || '').toLowerCase()))
     .filter(t => !filter || t.symbol.toLowerCase().includes(filter.toLowerCase()) || t.name.toLowerCase().includes(filter.toLowerCase()))
+  const chainShown = chainRows.slice(0, chainVisible)
 
   function trade(tok) {
     setSwapPrefill({ to: { ...tok, symbol: tok.symbol || tok.ticker, address: tok.ca || tok.address, decimals: tok.decimals ?? null } })
@@ -81,7 +83,7 @@ export default function MarketsView() {
           className="search-input"
           placeholder="Filter by ticker…"
           value={filter}
-          onChange={e => setFilter(e.target.value)}
+          onChange={e => { setFilter(e.target.value); setChainVisible(150) }}
         />
       </div>
 
@@ -153,7 +155,7 @@ export default function MarketsView() {
                 </tr>
               </thead>
               <tbody>
-                {chainRows.map((t, i) => (
+                {chainShown.map((t, i) => (
                   <tr key={t.ca} style={{ '--i': Math.min(i, 12) }}>
                     <td>
                       <span className="ticker-cell">
@@ -185,6 +187,17 @@ export default function MarketsView() {
               </tbody>
             </table>
           </div>
+          {chainRows.length > chainShown.length && (
+            <div className="chain-more reveal">
+              <button
+                type="button"
+                className="pill pill-ghost"
+                onClick={() => setChainVisible(v => v + 150)}
+              >
+                Show 150 more · {chainRows.length - chainShown.length} left
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

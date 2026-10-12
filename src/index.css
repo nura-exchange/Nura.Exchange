@@ -261,6 +261,12 @@ button { font-family: inherit; }
   border-top: 1px solid var(--line);
 }
 
+.chain-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
 /* ---------------- Navigation ---------------- */
 
 .nav-header {
