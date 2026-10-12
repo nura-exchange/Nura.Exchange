@@ -59,6 +59,7 @@ export default function MarketsView() {
   const losers = stocks.filter(s => (s.change24h ?? 0) < 0).length
 
   const stockCas = new Set(stocks.map(s => (s.ca || '').toLowerCase()))
+  const chainTotal = chainTokens.filter(t => !stockCas.has((t.ca || '').toLowerCase())).length
   const chainRows = chainTokens
     .filter(t => !stockCas.has((t.ca || '').toLowerCase()))
     .filter(t => !filter || t.symbol.toLowerCase().includes(filter.toLowerCase()) || t.name.toLowerCase().includes(filter.toLowerCase()))
@@ -75,7 +76,7 @@ export default function MarketsView() {
         <div>
           <h1 className="section-heading">Markets</h1>
           <p className="section-note">
-            {stocks.length} tokenized stocks &amp; ETFs live on Robinhood Chain · ETH {ethPrice ? `$${fmtPrice(ethPrice)}` : '—'} ·
+            {stocks.length} tokenized stocks &amp; ETFs{chainTotal > 0 ? ` + ${chainTotal} more markets` : ''} live on Robinhood Chain · ETH {ethPrice ? `$${fmtPrice(ethPrice)}` : '—'} ·
             {' '}{gainers} up / {losers} down · updated {updated || '…'}
           </p>
         </div>

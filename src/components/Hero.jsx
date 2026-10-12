@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { useStocks, useEthPrice } from '../hooks/useMarkets'
+import { useStocks, useEthPrice, useChainTokens } from '../hooks/useMarkets'
 
 function fmtUsd(n) {
   if (n === null || n === undefined) return '…'
@@ -9,13 +9,16 @@ function fmtUsd(n) {
 
 function HeroStats() {
   const { stocks } = useStocks()
+  const { chainTokens } = useChainTokens()
   const ethPrice = useEthPrice()
 
+  const stockCas = new Set(stocks.map(s => (s.ca || '').toLowerCase()))
+  const chainCount = chainTokens.filter(t => !stockCas.has((t.ca || '').toLowerCase())).length
   const stats = [
-    ['Markets', stocks.length ? String(stocks.length) : '…'],
+    ['Markets', String(stocks.length + chainCount)],
     ['ETH', fmtUsd(ethPrice)],
     ['Chain', '4663'],
-    ['Networks in', '16'],
+    ['Networks', '16'],
   ]
 
   return (
