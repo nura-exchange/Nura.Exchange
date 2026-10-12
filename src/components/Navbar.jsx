@@ -11,6 +11,7 @@ export default function Navbar() {
   return (
     <header className="nav-header">
       <a className="nav-brand" href="/" onClick={e => { e.preventDefault(); setActiveTab('Markets') }}>
+        <img className="nav-logo" src="/logo-nura.png" alt="" width="26" height="26" />
         <span className="wordmark">nura</span>
         <span className="nav-badge">Robinhood Chain</span>
       </a>

@@ -134,7 +134,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Ambient wash — pine tint top-right, silver bottom-left */
+/* Ambient glow — pine light bleeding from the page edges */
 body::before {
   content: "";
   position: fixed;
@@ -142,12 +142,13 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(120% 120% at 100% 0, rgba(63, 158, 116, 0.10) 0%, transparent 46%),
-    radial-gradient(120% 120% at 0 100%, rgba(200, 207, 209, 0.05) 0%, transparent 50%);
+    radial-gradient(70% 55% at 0 0, rgba(63, 158, 116, 0.20) 0%, transparent 58%),
+    radial-gradient(55% 50% at 100% 0, rgba(63, 158, 116, 0.13) 0%, transparent 58%),
+    radial-gradient(65% 55% at 0 100%, rgba(63, 158, 116, 0.15) 0%, transparent 58%),
+    radial-gradient(50% 45% at 100% 100%, rgba(63, 158, 116, 0.11) 0%, transparent 58%);
 }
 
 body {
-  background: var(--bg);
   color: var(--silver-bright);
   font-family: var(--font-sans);
   font-size: var(--text-body-sm);
@@ -300,6 +301,14 @@ button { font-family: inherit; }
   color: var(--silver-bright);
 }
 
+.nav-logo {
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: block;
+}
+
 .nav-badge {
   font-size: 10px;
   font-weight: var(--font-weight-semibold);
@@ -361,7 +370,8 @@ button { font-family: inherit; }
   min-height: 420px;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(146, 196, 168, 0.26);
+  box-shadow: 0 34px 90px -40px rgba(63, 158, 116, 0.45);
 }
 
 .hero-media {
@@ -369,81 +379,14 @@ button { font-family: inherit; }
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(130% 110% at 25% 105%, rgba(98, 46, 26, 0.75) 0%, transparent 55%),
-    radial-gradient(110% 95% at 80% -10%, rgba(47, 125, 92, 0.45) 0%, transparent 55%),
-    radial-gradient(100% 90% at 55% 45%, rgba(170, 118, 50, 0.4) 0%, transparent 60%),
-    #050505;
-}
-
-/* Liquid layer — blobs are displaced by the animated SVG turbulence filter */
-.hero-flow {
-  position: absolute;
-  inset: -25%;
-  filter: url(#nura-liquid);
-  will-change: filter;
-}
-
-.hero-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  mix-blend-mode: screen;
-  animation: blobDrift 36s ease-in-out infinite alternate;
-}
-
-.hero-blob.b1 {
-  width: 70vw; height: 70vw;
-  left: -14vw; top: -20vw;
-  background: radial-gradient(circle, rgba(96, 150, 118, 0.5), transparent 62%);
-  opacity: 0.75;
-}
-
-.hero-blob.b2 {
-  width: 60vw; height: 60vw;
-  right: -12vw; top: 6vh;
-  background: radial-gradient(circle, rgba(196, 138, 58, 0.5), transparent 62%);
-  opacity: 0.7;
-  animation-delay: -8s;
-  animation-duration: 44s;
-}
-
-.hero-blob.b3 {
-  width: 80vw; height: 80vw;
-  left: 18vw; bottom: -42vw;
-  background: radial-gradient(circle, rgba(124, 52, 30, 0.55), transparent 60%);
-  opacity: 0.75;
-  animation-delay: -14s;
-  animation-duration: 50s;
-}
-
-.hero-blob.b4 {
-  width: 38vw; height: 38vw;
-  left: 42vw; top: 30vh;
-  background: radial-gradient(circle, rgba(214, 176, 116, 0.32), transparent 58%);
-  opacity: 0.55;
-  animation-delay: -22s;
-  animation-duration: 30s;
-}
-
-/* Film grain — keeps the fluid from reading as flat CSS gradients */
-.hero-grain {
-  position: absolute;
-  inset: 0;
-  opacity: 0.16;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-@keyframes blobDrift {
-  0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-  50% { transform: translate3d(5vw, -4vh, 0) scale(1.14) rotate(8deg); }
-  100% { transform: translate3d(-4vw, 5vh, 0) scale(0.92) rotate(-6deg); }
+    url('/hero-nura.jpg') right center / cover no-repeat,
+    #06100f;
 }
 
 .hero-slogan {
   position: absolute;
   z-index: 2;
-  top: 30%;
+  top: 44%;
   left: 0;
   right: 0;
   margin: 0;
@@ -454,6 +397,7 @@ button { font-family: inherit; }
   line-height: var(--leading-subheading-lg);
   letter-spacing: -0.01em;
   color: var(--silver-bright);
+  text-shadow: 0 2px 30px rgba(2, 8, 7, 0.7), 0 1px 5px rgba(2, 8, 7, 0.45);
   animation: heroRise 1.25s var(--ease-glide) both;
 }
 
@@ -484,7 +428,7 @@ button { font-family: inherit; }
 .scroll-badge {
   position: absolute;
   left: 7%;
-  bottom: 40%;
+  bottom: 50%;
   z-index: 2;
   animation: spinSlow 16s linear infinite;
 }
@@ -1599,7 +1543,14 @@ button { font-family: inherit; }
   .nav-balance { display: none; }
   .hero { padding: 16px 16px 32px; }
   .hero-frame { height: min(56vh, 460px); min-height: 300px; }
-  .hero-slogan { font-size: var(--text-subheading); line-height: var(--leading-subheading); top: 26%; }
+  .hero-media { background-position: right center; }
+  .hero-media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(3, 10, 9, 0.58) 0%, rgba(3, 10, 9, 0.38) 45%, rgba(3, 10, 9, 0.62) 100%);
+  }
+  .hero-slogan { font-size: var(--text-subheading); line-height: var(--leading-subheading); top: 30%; }
   .scroll-badge { bottom: 36%; }
   .section-heading { font-size: var(--text-subheading-lg); line-height: var(--leading-subheading-lg); }
   .hero-stats { padding: 10px 14px; gap: 8px 14px; }
