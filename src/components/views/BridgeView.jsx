@@ -111,12 +111,21 @@ export default function BridgeView() {
   }[phase] || null
 
   return (
-    <div className="container view">
-      <div className="view-head">
+    <div className="container view split">
+      <aside className="split-aside">
         <h1 className="section-heading">Bridge</h1>
-        <p className="section-note">Bring funds to Robinhood Chain from {SOURCE_CHAINS.length} networks in a single signed transaction — routed by LI.FI.</p>
-      </div>
+        <p className="section-note">
+          Bring funds to Robinhood Chain from {SOURCE_CHAINS.length} networks in a single signed
+          transaction — routed by LI.FI, no middleman holds your assets.
+        </p>
+        <ul className="split-meta">
+          <li><span>Sources</span><span>{SOURCE_CHAINS.length} networks</span></li>
+          <li><span>Asset</span><span>Native ETH in, ETH out</span></li>
+          <li><span>Arrival</span><span>Usually under a minute</span></li>
+        </ul>
+      </aside>
 
+      <div className="split-main">
       <div className="trade-card">
         <div className="field">
           <div className="field-top">
@@ -203,6 +212,7 @@ export default function BridgeView() {
             </button>
           ))}
         </div>
+      </div>
       </div>
     </div>
   )

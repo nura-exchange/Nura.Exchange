@@ -7,6 +7,7 @@ import { AppProvider, useAppState } from './context/useAppState'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Hero from './components/Hero'
+import ManifestoBand from './components/ManifestoBand'
 import MarketsView from './components/views/MarketsView'
 import PortfolioView from './components/views/PortfolioView'
 import HistoryView from './components/views/HistoryView'
@@ -48,6 +49,7 @@ function Page() {
         {activeTab === 'Markets' && <Hero />}
         <ErrorBoundary>
           {activeTab === 'Markets' && <MarketsView />}
+          {activeTab === 'Markets' && <ManifestoBand />}
           {activeTab === 'Swap' && <SwapView />}
           {activeTab === 'Bridge' && <BridgeView />}
           {activeTab === 'Portfolio' && <PortfolioView />}

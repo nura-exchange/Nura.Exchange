@@ -1,26 +1,51 @@
-import { useAppState } from '../context/useAppState'
+function LiquidFilter() {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+      <defs>
+        <filter id="nura-liquid" x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.006 0.011"
+            numOctaves="2"
+            seed="7"
+            result="noise"
+          >
+            <animate
+              attributeName="baseFrequency"
+              dur="36s"
+              values="0.006 0.011; 0.011 0.006; 0.006 0.011"
+              repeatCount="indefinite"
+            />
+          </feTurbulence>
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale="140"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </defs>
+    </svg>
+  )
+}
 
 export default function Hero() {
-  const { setActiveTab } = useAppState()
-
   return (
     <section className="hero">
       <div className="hero-media" aria-hidden="true">
-        <div className="hero-blob b1" />
-        <div className="hero-blob b2" />
-        <div className="hero-blob b3" />
+        <div className="hero-flow">
+          <div className="hero-blob b1" />
+          <div className="hero-blob b2" />
+          <div className="hero-blob b3" />
+          <div className="hero-blob b4" />
+        </div>
+        <div className="hero-grain" />
       </div>
+      <LiquidFilter />
 
       <div className="hero-content">
         <h1 className="hero-display">nura</h1>
-        <div className="hero-actions">
-          <button type="button" className="pill pill-ghost-dark" onClick={() => setActiveTab('Swap')}>
-            Start trading
-          </button>
-          <button type="button" className="pill pill-ghost-dark" onClick={() => setActiveTab('Bridge')}>
-            Bridge funds
-          </button>
-        </div>
       </div>
 
       <div className="scroll-badge" aria-hidden="true">

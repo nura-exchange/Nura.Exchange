@@ -175,12 +175,21 @@ export default function SwapView() {
   }, [stocks, ethPrice, fromToken, pickerQuery])
 
   return (
-    <div className="container view">
-      <div className="view-head">
+    <div className="container view split">
+      <aside className="split-aside">
         <h1 className="section-heading">Swap</h1>
-        <p className="section-note">Swaps route through LI.FI across Robinhood Chain liquidity — you sign every transaction yourself.</p>
-      </div>
+        <p className="section-note">
+          Tokenized stocks, stables and crypto — routed through LI.FI across Robinhood Chain liquidity.
+          You sign every transaction yourself.
+        </p>
+        <ul className="split-meta">
+          <li><span>Routing</span><span>LI.FI · best price</span></li>
+          <li><span>Custody</span><span>Self — your keys only</span></li>
+          <li><span>Slippage</span><span>{SLIPPAGE}%</span></li>
+        </ul>
+      </aside>
 
+      <div className="split-main">
       <div className="trade-card">
         <div className="field">
           <div className="field-top">
@@ -290,6 +299,7 @@ export default function SwapView() {
             <a href={txUrl(lastHash)} target="_blank" rel="noreferrer">View transaction on Blockscout ↗</a>
           </div>
         )}
+      </div>
       </div>
     </div>
   )
