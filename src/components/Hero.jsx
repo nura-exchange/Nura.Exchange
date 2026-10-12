@@ -1,3 +1,40 @@
+import { Fragment } from 'react'
+import { useStocks, useEthPrice } from '../hooks/useMarkets'
+
+function fmtUsd(n) {
+  if (n === null || n === undefined) return '…'
+  if (n >= 1000) return `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+  return `$${n.toFixed(2)}`
+}
+
+function HeroStats() {
+  const { stocks } = useStocks()
+  const ethPrice = useEthPrice()
+
+  const stats = [
+    ['Markets', stocks.length ? String(stocks.length) : '…'],
+    ['ETH', fmtUsd(ethPrice)],
+    ['Chain', '4663'],
+    ['Networks in', '16'],
+  ]
+
+  return (
+    <div className="hero-stats reveal reveal-d2">
+      {stats.map(([label, value], i) => (
+        <Fragment key={label}>
+          {i > 0 && <span className="hstat-div" aria-hidden="true" />}
+          <span className="hstat">
+            <span className="hstat-body">
+              <span className="hstat-label">{label}</span>
+              <span className="hstat-value mono">{value}</span>
+            </span>
+          </span>
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
 function LiquidFilter() {
   return (
     <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
@@ -59,6 +96,7 @@ export default function Hero() {
 
         <span className="hero-dot" aria-hidden="true" />
       </div>
+      <HeroStats />
       <LiquidFilter />
     </section>
   )

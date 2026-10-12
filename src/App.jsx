@@ -15,6 +15,7 @@ import HistoryView from './components/views/HistoryView'
 import SwapView from './components/views/SwapView'
 import BridgeView from './components/views/BridgeView'
 import NewsView from './components/views/NewsView'
+import DocsView from './components/views/DocsView'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
 import WrongNetworkBanner from './components/WrongNetworkBanner'
@@ -41,6 +42,10 @@ function Notifications() {
 
 function Page() {
   const { activeTab } = useAppState()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [activeTab])
 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') {
@@ -86,6 +91,7 @@ function Page() {
           {activeTab === 'Portfolio' && <PortfolioView />}
           {activeTab === 'History' && <HistoryView />}
           {activeTab === 'News' && <NewsView />}
+          {activeTab === 'Docs' && <DocsView />}
         </ErrorBoundary>
       </div>
       <Notifications />
