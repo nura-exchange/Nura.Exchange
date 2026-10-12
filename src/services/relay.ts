@@ -155,6 +155,7 @@ export type RelayStatusValue =
   | 'success'
   | 'delayed'
   | 'refund'
+  | 'fallback'
   | 'failure'
   | 'unknown'
 
@@ -267,16 +268,20 @@ export async function getRelayQuote(params: RelayQuoteParams): Promise<RelayQuot
   return normalizeQuote(json)
 }
 
-/** Poll this with the requestId from the quote until status is terminal. */
+/**
+ * Poll this with the requestId from the quote until status is terminal.
+ * v3 is the current API — the legacy /intents/status returns a different enum
+ * (`received`/`fallback`) that this parser does not understand.
+ */
 export async function getRelayStatus(requestId: string): Promise<RelayStatus> {
-  const res = await relayFetch(`/intents/status?requestId=${encodeURIComponent(requestId)}`, {
+  const res = await relayFetch(`/intents/status/v3?requestId=${encodeURIComponent(requestId)}`, {
     headers: { Accept: 'application/json' },
   }, 0)
   const json = await res.json().catch(() => null)
   if (!res.ok || !json) {
     throw new RelayError('network', 'Failed to fetch relay status')
   }
-  const known: RelayStatusValue[] = ['waiting', 'depositing', 'pending', 'submitted', 'success', 'delayed', 'refund', 'failure']
+  const known: RelayStatusValue[] = ['waiting', 'depositing', 'pending', 'submitted', 'success', 'delayed', 'refund', 'fallback', 'failure']
   const raw = String(json.status || '').toLowerCase() as RelayStatusValue
   return {
     status: known.includes(raw) ? raw : 'unknown',
@@ -301,11 +306,11 @@ export async function waitForRelayDelivery(
       last = await getRelayStatus(requestId)
       onTick?.(last)
       if (last.status === 'success') return last
-      if (last.status === 'refund' || last.status === 'failure') {
-        throw new RelayError(
-          'no_route',
-          last.status === 'refund' ? 'Transfer refunded on the origin chain' : 'Cross-chain fill failed',
-        )
+      if (last.status === 'refund' || last.status === 'fallback') {
+        throw new RelayError('no_route', 'Transfer refunded on the origin chain')
+      }
+      if (last.status === 'failure') {
+        throw new RelayError('no_route', 'Cross-chain fill failed')
       }
     } catch (e) {
       // transient status failures must not abort the wait
