@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAppState } from '../context/useAppState'
 
 const RANGES = ['1H', '1D', '1W', '1M', '1Y']
@@ -176,7 +177,7 @@ export default function ChartModal({ token, onClose }) {
   const symbol = token.symbol || token.ticker
   const change = token.change24h
 
-  return (
+  return createPortal(
     <div className="chart-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="chart-panel" role="dialog" aria-label={`${symbol} chart`}>
         <div className="chart-head">
@@ -249,6 +250,7 @@ export default function ChartModal({ token, onClose }) {
           <button type="button" className="pill pill-primary" onClick={trade}>Trade {symbol}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

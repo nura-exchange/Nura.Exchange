@@ -1572,7 +1572,7 @@ button { font-family: inherit; }
 
 @keyframes viewFade {
   from { opacity: 0; transform: translate3d(0, 18px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 1; transform: none; }
 }
 .view-fade { animation: viewFade 0.55s var(--ease-glide) both; }
 
