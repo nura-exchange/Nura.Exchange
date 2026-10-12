@@ -195,6 +195,13 @@ export default function SwapView() {
   const impact = relayQuote
     ? relayQuote.priceImpact
     : quote?.estimate?.priceImpact ?? quote?.impact ?? null
+  // Relay returns slippageTolerance.total in basis points (200 = 2%)
+  const slippageTol = relayQuote?.details?.slippageTolerance
+  const relaySlippagePct = slippageTol?.total != null && `${slippageTol.total}` !== ''
+    ? Number(slippageTol.total) / 100
+    : slippageTol?.destination?.percent != null && slippageTol.destination.percent !== ''
+      ? parseFloat(slippageTol.destination.percent)
+      : null
   const routeLabel = relayQuote
     ? 'Relay (Cross-chain 1-click)'
     : quote?.toolDetails?.name || quote?.tool || null
@@ -406,7 +413,7 @@ export default function SwapView() {
                 {relayQuote.timeEstimate != null && (
                   <div className="q-line"><span>Est. delivery</span><span>{relayQuote.timeEstimate >= 60 ? `~${Math.ceil(relayQuote.timeEstimate / 60)} min` : `~${relayQuote.timeEstimate} sec`}</span></div>
                 )}
-                <div className="q-line"><span>Slippage</span><span>{SLIPPAGE}%</span></div>
+                <div className="q-line"><span>Slippage</span><span>{relaySlippagePct != null ? `${relaySlippagePct}%` : 'Auto'}</span></div>
               </>
             ) : (
               <>

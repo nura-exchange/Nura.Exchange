@@ -89,6 +89,13 @@ export interface RelayFees {
   [key: string]: RelayFeeEntry | undefined
 }
 
+export interface RelaySlippageBreakdown {
+  /** basis points (200 = 2%) */
+  total?: number | string
+  origin?: { usd?: string; value?: string; percent?: string }
+  destination?: { usd?: string; value?: string; percent?: string }
+}
+
 export interface RelayDetails {
   operation?: string
   sender?: string
@@ -100,7 +107,7 @@ export interface RelayDetails {
   swapImpact?: RelayImpact
   expandedPriceImpact?: RelayImpact
   rate?: string
-  slippageTolerance?: number
+  slippageTolerance?: RelaySlippageBreakdown
   timeEstimate?: number
   route?: string
 }
@@ -205,10 +212,17 @@ function mapQuoteHttpError(status: number, body: { message?: string; errorCode?:
 
 function sumFeeUsd(fees?: RelayFees): number | null {
   if (!fees) return null
+  // `relayer` already equals relayerGas + relayerService — summing every leg double-counts it.
+  const skip = new Set<string>()
+  if (fees.relayer) {
+    skip.add('relayerGas')
+    skip.add('relayerService')
+  }
   let total = 0
   let seen = false
-  for (const entry of Object.values(fees)) {
-    const usd = entry?.amountUsd != null ? parseFloat(entry.amountUsd) : NaN
+  for (const [key, entry] of Object.entries(fees)) {
+    if (skip.has(key) || !entry) continue
+    const usd = entry.amountUsd != null ? parseFloat(entry.amountUsd) : NaN
     if (Number.isFinite(usd)) {
       total += usd
       seen = true
