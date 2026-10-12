@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/rpc': {
-        target: 'https://rpc.drpc.testnet.arc.io',
+        target: 'https://rpc.mainnet.chain.robinhood.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/rpc/, ''),
       },

@@ -14,7 +14,7 @@ export default function Footer() {
         </div>
         <div className="ft-col ft-links">
           <a href="https://docs.robinhood.com/chain" target="_blank" rel="noreferrer">Docs</a>
-          <a href="https://github.com/wabrent/AnchorFX" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/nura-exchange/Nura.Exchange" target="_blank" rel="noreferrer">GitHub</a>
           <a href="https://robinhoodchain.blockscout.com" target="_blank" rel="noreferrer">Explorer</a>
           <a href="https://quoro.exchange/docs" target="_blank" rel="noreferrer">API</a>
         </div>
