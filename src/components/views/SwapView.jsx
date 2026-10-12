@@ -51,7 +51,7 @@ export default function SwapView() {
   useEffect(() => {
     if (!toToken) {
       const aapl = stocks.find(s => s.ticker === 'AAPL') || stocks[0]
-      if (aapl) setToToken({ ...aapl, address: aapl.ca, decimals: 18 })
+      if (aapl) setToToken({ ...aapl, symbol: aapl.symbol || aapl.ticker, address: aapl.ca, decimals: 18 })
     }
   }, [stocks, toToken])
 
@@ -165,7 +165,7 @@ export default function SwapView() {
       change24h: null,
       spark: [],
     }))
-    const st = stocks.map(s => ({ ...s, address: s.ca, decimals: 18 }))
+    const st = stocks.map(s => ({ ...s, symbol: s.symbol || s.ticker, address: s.ca, decimals: 18 }))
     const all = [...core.filter(c => c.address.toLowerCase() !== fromToken.address.toLowerCase()), ...st]
     const q = pickerQuery.trim().toLowerCase()
     if (!q) return all
@@ -248,7 +248,7 @@ export default function SwapView() {
                         type="button"
                         key={t.address}
                         className={`picker-item ${toToken?.ca === t.ca && toToken?.address === t.address ? 'active' : ''}`}
-                        onClick={() => { setToToken({ ...t, ca: t.ca || t.address }); setToPickerOpen(false); setQuote(null) }}
+                        onClick={() => { setToToken({ ...t, symbol: t.symbol || t.ticker, ca: t.ca || t.address }); setToPickerOpen(false); setQuote(null) }}
                       >
                         <span className="picker-sym">{t.symbol || t.ticker}</span>
                         <span className="picker-name">{t.name}</span>

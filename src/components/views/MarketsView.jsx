@@ -48,7 +48,7 @@ export default function MarketsView() {
   const losers = stocks.filter(s => (s.change24h ?? 0) < 0).length
 
   function trade(tok) {
-    setSwapPrefill({ to: { ...tok, address: tok.ca || tok.address, decimals: 18 } })
+    setSwapPrefill({ to: { ...tok, symbol: tok.symbol || tok.ticker, address: tok.ca || tok.address, decimals: 18 } })
     setActiveTab('Swap')
   }
 

@@ -1,6 +1,6 @@
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
+import { RainbowKitProvider, lightTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
 import { config, robinhoodChain } from './config'
 import { AppProvider, useAppState } from './context/useAppState'
@@ -67,7 +67,14 @@ export default function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider initialChain={robinhoodChain}>
+        <RainbowKitProvider
+          initialChain={robinhoodChain}
+          theme={lightTheme({
+            accentColor: '#000000',
+            accentColorForeground: '#ffffff',
+            borderRadius: 'none',
+          })}
+        >
           <AppProvider>
             <Page />
           </AppProvider>

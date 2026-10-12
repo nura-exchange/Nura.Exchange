@@ -252,14 +252,18 @@ button { font-family: inherit; }
 
 .hero {
   position: relative;
-  height: calc(100vh - var(--nav-height));
-  min-height: 560px;
-  margin: 0;
+  background: #0a0a0a;
+  padding: 28px 28px 44px;
+}
+
+.hero-frame {
+  position: relative;
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+  height: min(64vh, 620px);
+  min-height: 420px;
   overflow: hidden;
-  background: #0d0b09;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: var(--radius-cards);
 }
 
 .hero-media {
@@ -267,10 +271,10 @@ button { font-family: inherit; }
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(140% 120% at 20% 110%, rgb(165, 45, 37) 0%, transparent 55%),
-    radial-gradient(120% 100% at 85% -10%, rgb(160, 224, 171) 0%, transparent 50%),
-    radial-gradient(100% 100% at 50% 50%, rgb(255, 172, 46) 0%, transparent 60%),
-    #120d09;
+    radial-gradient(130% 110% at 25% 105%, rgba(98, 46, 26, 0.75) 0%, transparent 55%),
+    radial-gradient(110% 95% at 80% -10%, rgba(96, 128, 88, 0.55) 0%, transparent 55%),
+    radial-gradient(100% 90% at 55% 45%, rgba(170, 118, 50, 0.42) 0%, transparent 60%),
+    #050505;
 }
 
 /* Liquid layer — blobs are displaced by the animated SVG turbulence filter */
@@ -284,50 +288,50 @@ button { font-family: inherit; }
 .hero-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
+  filter: blur(90px);
   mix-blend-mode: screen;
-  animation: blobDrift 32s ease-in-out infinite alternate;
+  animation: blobDrift 36s ease-in-out infinite alternate;
 }
 
 .hero-blob.b1 {
   width: 70vw; height: 70vw;
   left: -14vw; top: -20vw;
-  background: radial-gradient(circle, rgba(160, 224, 171, 0.9), transparent 62%);
-  opacity: 0.8;
+  background: radial-gradient(circle, rgba(122, 158, 104, 0.55), transparent 62%);
+  opacity: 0.75;
 }
 
 .hero-blob.b2 {
   width: 60vw; height: 60vw;
   right: -12vw; top: 6vh;
-  background: radial-gradient(circle, rgba(255, 172, 46, 0.85), transparent 62%);
-  opacity: 0.75;
+  background: radial-gradient(circle, rgba(196, 138, 58, 0.5), transparent 62%);
+  opacity: 0.7;
   animation-delay: -8s;
-  animation-duration: 40s;
+  animation-duration: 44s;
 }
 
 .hero-blob.b3 {
   width: 80vw; height: 80vw;
   left: 18vw; bottom: -42vw;
-  background: radial-gradient(circle, rgba(165, 45, 37, 0.95), transparent 60%);
-  opacity: 0.85;
+  background: radial-gradient(circle, rgba(124, 52, 30, 0.55), transparent 60%);
+  opacity: 0.75;
   animation-delay: -14s;
-  animation-duration: 46s;
+  animation-duration: 50s;
 }
 
 .hero-blob.b4 {
   width: 38vw; height: 38vw;
-  left: 42vw; top: 34vh;
-  background: radial-gradient(circle, rgba(255, 214, 140, 0.55), transparent 58%);
-  opacity: 0.6;
+  left: 42vw; top: 30vh;
+  background: radial-gradient(circle, rgba(214, 176, 116, 0.32), transparent 58%);
+  opacity: 0.55;
   animation-delay: -22s;
-  animation-duration: 26s;
+  animation-duration: 30s;
 }
 
 /* Film grain — keeps the fluid from reading as flat CSS gradients */
 .hero-grain {
   position: absolute;
   inset: 0;
-  opacity: 0.14;
+  opacity: 0.16;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
 }
@@ -338,34 +342,46 @@ button { font-family: inherit; }
   100% { transform: translate3d(-4vw, 5vh, 0) scale(0.92) rotate(-6deg); }
 }
 
-.hero-content {
-  position: relative;
+.hero-slogan {
+  position: absolute;
   z-index: 2;
-  text-align: center;
-  padding: 0 28px;
-}
-
-.hero-display {
+  top: 30%;
+  left: 0;
+  right: 0;
   margin: 0;
-  font-size: clamp(96px, 21vw, var(--text-display));
+  text-align: center;
+  font-size: var(--text-subheading-lg);
   font-weight: var(--font-weight-regular);
-  line-height: var(--leading-display);
-  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-subheading-lg);
+  letter-spacing: var(--tracking-subheading-lg);
   color: var(--color-paper);
   animation: heroRise 1.25s var(--ease-glide) both;
 }
 
+.hero-dot {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 37%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.9;
+}
+
 @keyframes heroRise {
-  from { opacity: 0; transform: translate3d(0, 40px, 0); }
+  from { opacity: 0; transform: translate3d(0, 30px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 .scroll-badge {
   position: absolute;
-  left: 24px;
-  bottom: 24px;
+  left: 7%;
+  bottom: 40%;
   z-index: 2;
-  animation: spinSlow 14s linear infinite;
+  animation: spinSlow 16s linear infinite;
 }
 
 .scroll-text {
@@ -479,6 +495,13 @@ button { font-family: inherit; }
 }
 
 .pill:disabled { cursor: not-allowed; opacity: 0.4; }
+
+.pill-primary:disabled {
+  opacity: 1;
+  background: transparent;
+  border: 1px solid var(--color-ash-mist);
+  color: var(--color-ash-mist);
+}
 
 .pill-ghost { border: 1px solid #000; color: #000; }
 .pill-ghost:hover:not(:disabled) { letter-spacing: 0.04em; }
@@ -967,26 +990,22 @@ button { font-family: inherit; }
   100% { background-position: -200% 0; }
 }
 
-/* ---------------- RainbowKit (monochrome override) ---------------- */
+/* ---------------- RainbowKit (monochrome override) ----------------
+   RainbowKit injects theme vars on [data-rk]; theme itself comes from
+   lightTheme({ accentColor: '#000', borderRadius: 'none' }) in App.jsx.
+   Here we force the system's radius discipline and kill shadows. */
 
-:root {
-  --rk-accent-color: #000000;
-  --rk-accent-color-muted: #636363;
-  --rk-connection-color: #000000;
-  --rk-error-color: #a52d25;
-  --rk-modal-border-color: #000000;
-  --rk-modal-background: #ffffff;
-  --rk-wallet-option-background: #ffffff;
-  --rk-wallet-option-hover-background: #f2f2f2;
-  --rk-border-radius: 0px;
+[data-rk] {
+  --rk-radii-connect: 75.024px !important;
+  --rk-radii-actionButton: 75.024px !important;
+  --rk-shadows-connect: none !important;
+  --rk-shadows-dialog: none !important;
+  --rk-shadows-profileDetailsAction: none !important;
+  --rk-shadows-selected: none !important;
+  --rk-shadows-selectedWallet: none !important;
+  --rk-shadows-walletLogo: none !important;
+  --rk-fonts-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
-
-.rk-connect-button-button {
-  border-radius: var(--radius-full) !important;
-  font-family: var(--font-roobert) !important;
-}
-
-.rk-modal-title { font-family: var(--font-roobert) !important; }
 
 /* ---------------- Responsive ---------------- */
 
@@ -1008,7 +1027,9 @@ button { font-family: inherit; }
 
 @media (max-width: 600px) {
   .nav-balance { display: none; }
-  .hero { min-height: 460px; }
-  .hero-display { font-size: 96px; }
+  .hero { padding: 16px 16px 32px; }
+  .hero-frame { height: min(56vh, 460px); min-height: 300px; }
+  .hero-slogan { font-size: var(--text-subheading); line-height: var(--leading-subheading); top: 26%; }
+  .scroll-badge { bottom: 36%; }
   .section-heading { font-size: var(--text-subheading-lg); line-height: var(--leading-subheading-lg); }
 }
