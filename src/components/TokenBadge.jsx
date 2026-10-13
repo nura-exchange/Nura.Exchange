@@ -45,7 +45,9 @@ export function TokenLogo({ token, symbol, showChain = true }) {
         : <span className="tok-logo tok-logo-fallback">{name.slice(0, 2)}</span>}
       {showChain && (
         <span className="chain-badge" title="Robinhood Chain · 4663" aria-label="Robinhood Chain">
-          <span className="chain-badge-mark">R</span>
+          <svg viewBox="0 0 24 24" width="9" height="9" fill="currentColor" aria-hidden="true">
+            <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
+          </svg>
         </span>
       )}
     </span>

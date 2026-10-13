@@ -987,8 +987,8 @@ button { font-family: inherit; }
   position: absolute;
   right: -4px;
   bottom: -4px;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   border-radius: var(--radius-full);
   background: var(--pine-bright);
   color: #06110c;
@@ -997,13 +997,7 @@ button { font-family: inherit; }
   justify-content: center;
   box-shadow: 0 0 0 2px var(--panel);
 }
-.chain-badge-mark {
-  font-family: var(--font-display);
-  font-size: 8px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
-}
+.chain-badge svg { display: block; }
 
 .verified-badge {
   display: inline-flex;
