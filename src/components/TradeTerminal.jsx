@@ -615,6 +615,7 @@ export default function TradeTerminal({ token, onClose }) {
             ? <img className="tok-logo" src={token.logo} alt="" />
             : <span className="tok-logo tok-logo-fallback">{symbol.slice(0, 2)}</span>}
           <div className="chart-id">
+            <div className="micro-label chart-eyebrow"><span className="live-dot" />Robinhood · 4663</div>
             <div className="chart-name"><strong>{symbol}</strong> <span className="muted">{token.name}</span></div>
             <div className="chart-addr mono dim">{ca.slice(0, 6)}…{ca.slice(-4)}</div>
           </div>
