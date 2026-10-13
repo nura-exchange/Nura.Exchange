@@ -132,6 +132,22 @@ export default function SwapView() {
   }, [amountIn, fromToken])
 
   const tooBig = parsedIn > fromBalance.value
+
+  function setPct(pct) {
+    // keep a small ETH reserve for gas when spending the full native balance
+    const reserve = fromSel === 'ETH' && pct === 1 ? 0.0005 : 0
+    const v = Math.max(0, fromBalance.balance * pct - reserve)
+    const dec = fromSel === 'ETH' ? 6 : 4
+    const f = 10 ** dec
+    setAmountIn(v > 0 ? String(Math.floor(v * f) / f) : '')
+    setQuote(null)
+    setRelayQuote(null)
+  }
+
+  const amountNum = parseFloat(amountIn)
+  const payUsd = Number.isFinite(amountNum) && amountNum > 0
+    ? (fromSel === 'ETH' ? (ethPrice ? amountNum * ethPrice : null) : amountNum)
+    : null
   const sameToken = toToken && fromToken.address.toLowerCase() === toToken.address?.toLowerCase()
 
   // quote (debounced): local router on Robinhood Chain; Relay vs LI.FI race from other chains
@@ -381,6 +397,22 @@ export default function SwapView() {
                 </button>
               ))}
             </div>
+          </div>
+          <div className="field-sub">
+            <span className="field-usd">{payUsd != null ? `≈ $${fmt(payUsd, 2)}` : ' '}</span>
+            <span className="quick-amounts">
+              {[[0.25, '25%'], [0.5, '50%'], [0.75, '75%'], [1, 'Max']].map(([p, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="quick-btn"
+                  disabled={!isConnected || !(fromBalance.balance > 0)}
+                  onClick={() => setPct(p)}
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
           </div>
           {tooBig && <div className="field-note">Insufficient {fromToken.symbol} balance{isCrossChain ? ` on ${payChain?.name}` : ''}</div>}
         </div>

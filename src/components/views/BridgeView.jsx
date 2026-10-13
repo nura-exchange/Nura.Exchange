@@ -5,6 +5,27 @@ import { SOURCE_CHAINS, robinhoodChain, NATIVE, txUrl } from '../../config'
 import { getQuote, executeQuote, quoteError, remember, parseUnits, formatUnits } from '../../lib/trade'
 
 const SLIPPAGE = 0.5
+
+const STEPS = [
+  ['switch', 'Switch network'],
+  ['approve', 'Approve'],
+  ['sign', 'Confirm in wallet'],
+  ['pending', 'Sending'],
+]
+
+function Stepper({ phase }) {
+  const idx = STEPS.findIndex(([k]) => k === phase)
+  return (
+    <ol className="stepper" aria-label="Bridge progress">
+      {STEPS.map(([k, label], i) => (
+        <li key={k} className={`stepper-item ${i < idx ? 'done' : i === idx ? 'now' : ''}`} aria-current={i === idx ? 'step' : undefined}>
+          <span className="stepper-dot" aria-hidden="true">{i < idx ? '✓' : i + 1}</span>
+          <span>{label}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
 const DEAD = '0x000000000000000000000000000000000000dEaD'
 
 function fmt(n, d = 4) {
@@ -193,6 +214,8 @@ export default function BridgeView() {
                   : !quote ? 'Fetching quote…'
                     : `Bridge ${amount} ${source.native} to Robinhood`}
         </button>
+
+        {busy && <Stepper phase={phase} />}
 
         {lastHash && (
           <div className="tx-link-row">

@@ -1,5 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useStocks, useEthPrice, useChainTokens } from '../hooks/useMarkets'
+import { useChainPulse } from '../hooks/useChainPulse'
+import { usePulse } from '../hooks/useQuoro'
+import HeroSearch from './HeroSearch'
 
 function fmtUsd(n) {
   if (n === null || n === undefined) return '…'
@@ -39,6 +42,8 @@ function HeroStats() {
   const { stocks } = useStocks()
   const { chainTokens } = useChainTokens()
   const ethPrice = useEthPrice()
+  const { block, blockTimeMs } = useChainPulse()
+  const quoro = usePulse()
 
   const stockCas = new Set(stocks.map(s => (s.ca || '').toLowerCase()))
   const chainCount = chainTokens.filter(t => !stockCas.has((t.ca || '').toLowerCase())).length
@@ -48,10 +53,15 @@ function HeroStats() {
   const shownEth = useCountUp(ethPrice)
 
   const stats = [
-    ['Markets', shownTotal == null ? '…' : Math.round(shownTotal).toLocaleString('en-US')],
-    ['ETH', ethPrice == null ? '…' : fmtUsd(shownEth)],
-    ['Chain', '4663'],
-    ['Networks', '16'],
+    ['Markets', shownTotal == null ? '—' : Math.round(shownTotal).toLocaleString('en-US')],
+    ['ETH', ethPrice == null ? '—' : fmtUsd(shownEth)],
+    ['Up / down 24h', stocks.some(s => s.change24h != null)
+      ? `${stocks.filter(s => s.change24h > 0).length} / ${stocks.filter(s => s.change24h < 0).length}` : '—'],
+    ['Red-flagged launches', quoro?.flagged == null ? '—' : `${quoro.flagged} of ${quoro.scored}`],
+    ['New tokens 24h', quoro?.tokens == null ? '—' : quoro.tokens.toLocaleString('en-US')],
+    ['Block', block == null ? '—' : `#${block.toLocaleString('en-US')}`],
+    ['Block time', blockTimeMs == null ? '—' : blockTimeMs < 1000 ? `${Math.round(blockTimeMs)} ms` : `${(blockTimeMs / 1000).toFixed(1)} s`],
+    ['Networks in', '16'],
   ]
 
   return (
@@ -90,7 +100,7 @@ export default function Hero() {
           </svg>
         </div>
 
-        <span className="hero-dot" aria-hidden="true" />
+        <HeroSearch />
       </div>
       <HeroStats />
     </section>

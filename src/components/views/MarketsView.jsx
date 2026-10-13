@@ -3,6 +3,7 @@ import { useAppState } from '../../context/useAppState'
 import { useStocks, useEthPrice, useChainTokens } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
 import ChartModal from '../ChartModal'
+import Spark from '../Spark'
 
 function fmtPrice(n) {
   if (n === null || n === undefined) return '—'
@@ -20,23 +21,18 @@ function fmtVol(v) {
   return `$${v.toFixed(0)}`
 }
 
-function Spark({ data }) {
-  if (!Array.isArray(data) || data.length < 2) return <span className="dim">—</span>
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const range = max - min || 1
-  const w = 96
-  const h = 26
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w
-    const y = h - ((v - min) / range) * (h - 2) - 1
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  }).join(' ')
-  return (
-    <svg width={w} height={h} className="spark" aria-hidden="true">
-      <polyline points={pts} pathLength="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
-    </svg>
-  )
+const SORTS = [
+  ['gain', 'Top gainers'],
+  ['loss', 'Top losers'],
+  ['price', 'Price'],
+  ['az', 'A–Z'],
+]
+
+const SORTERS = {
+  gain: (a, b) => (b.change24h ?? -1e9) - (a.change24h ?? -1e9),
+  loss: (a, b) => (a.change24h ?? 1e9) - (b.change24h ?? 1e9),
+  price: (a, b) => (b.priceUsd ?? -1) - (a.priceUsd ?? -1),
+  az: (a, b) => a.ticker.localeCompare(b.ticker),
 }
 
 export default function MarketsView() {
@@ -48,6 +44,7 @@ export default function MarketsView() {
   const [updated, setUpdated] = useState(null)
   const [chainVisible, setChainVisible] = useState(150)
   const [chartTok, setChartTok] = useState(null)
+  const [sort, setSort] = useState('gain')
 
   function openChart(e, tok) {
     if (e.target.closest('button')) return
@@ -60,7 +57,7 @@ export default function MarketsView() {
 
   const rows = stocks
     .filter(s => !filter || s.ticker.toLowerCase().includes(filter.toLowerCase()) || s.name.toLowerCase().includes(filter.toLowerCase()))
-    .sort((a, b) => (b.change24h ?? -Infinity) - (a.change24h ?? -Infinity))
+    .sort(SORTERS[sort])
 
   const gainers = stocks.filter(s => (s.change24h ?? 0) > 0).length
   const losers = stocks.filter(s => (s.change24h ?? 0) < 0).length
@@ -88,12 +85,28 @@ export default function MarketsView() {
             {' '}{gainers} up / {losers} down · updated {updated || '…'}
           </p>
         </div>
-        <input
-          className="search-input"
-          placeholder="Filter by ticker…"
-          value={filter}
-          onChange={e => { setFilter(e.target.value); setChainVisible(150) }}
-        />
+        <div className="view-tools">
+          <div className="seg" role="group" aria-label="Sort markets">
+            {SORTS.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={`seg-btn ${sort === key ? 'active' : ''}`}
+                aria-pressed={sort === key}
+                onClick={() => setSort(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <input
+            className="search-input"
+            placeholder="Filter by ticker…"
+            aria-label="Filter by ticker or name"
+            value={filter}
+            onChange={e => { setFilter(e.target.value); setChainVisible(150) }}
+          />
+        </div>
       </div>
 
       {loading ? (
