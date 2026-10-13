@@ -1,11 +1,31 @@
 import { useState, useRef, useEffect } from 'react'
+import ethereum from '../assets/chains/ethereum.svg'
+import base from '../assets/chains/base.svg'
+import arbitrum from '../assets/chains/arbitrum.svg'
+import optimism from '../assets/chains/optimism.svg'
+import bnb from '../assets/chains/bnb.svg'
+import polygon from '../assets/chains/polygon.svg'
+import unichain from '../assets/chains/unichain.svg'
+import linea from '../assets/chains/linea.svg'
+import zksync from '../assets/chains/zksync.svg'
+import scroll from '../assets/chains/scroll.svg'
+import blast from '../assets/chains/blast.svg'
+import ink from '../assets/chains/ink.svg'
+import worldchain from '../assets/chains/worldchain.svg'
+import soneium from '../assets/chains/soneium.svg'
+import abstract from '../assets/chains/abstract.svg'
+import mode from '../assets/chains/mode.svg'
 
-const iconUrl = (id) => `https://icons.llamao.fi/icons/chains/${id}.jpg`
+const ICONS = {
+  ethereum, base, arbitrum, optimism, bnb, polygon, unichain, linea,
+  zksync, scroll, blast, ink, worldchain, soneium, abstract, mode,
+}
 
-export function ChainIcon({ id, name, size = 20 }) {
+export function ChainIcon({ slug, name, size = 20 }) {
   const [err, setErr] = useState(false)
-  const letter = (name || '?').trim().slice(0, 1).toUpperCase()
-  if (err) {
+  const src = ICONS[slug]
+  if (!src || err) {
+    const letter = (name || '?').trim().slice(0, 1).toUpperCase()
     return (
       <span
         className="chain-ico chain-ico-fb"
@@ -16,15 +36,7 @@ export function ChainIcon({ id, name, size = 20 }) {
     )
   }
   return (
-    <img
-      className="chain-ico"
-      src={iconUrl(id)}
-      width={size}
-      height={size}
-      alt=""
-      loading="lazy"
-      onError={() => setErr(true)}
-    />
+    <img className="chain-ico" src={src} width={size} height={size} alt="" loading="lazy" onError={() => setErr(true)} />
   )
 }
 
@@ -51,7 +63,7 @@ export default function ChainSelect({ chains, value, onChange }) {
         aria-expanded={open}
         onClick={() => setOpen(o => !o)}
       >
-        <ChainIcon id={sel.chain.id} name={sel.name} size={20} />
+        <ChainIcon slug={sel.key} name={sel.name} size={20} />
         <span className="chain-select-name">{sel.name}</span>
         <span className="chain-select-native">{sel.native}</span>
         <span className="chev">▾</span>
@@ -68,7 +80,7 @@ export default function ChainSelect({ chains, value, onChange }) {
                 className={`picker-item ${c.key === value ? 'active' : ''}`}
                 onClick={() => { onChange(c.key); setOpen(false) }}
               >
-                <ChainIcon id={c.chain.id} name={c.name} size={20} />
+                <ChainIcon slug={c.key} name={c.name} size={20} />
                 <span className="picker-name">{c.name}</span>
                 <span className="picker-price">{c.native}</span>
               </button>

@@ -203,7 +203,7 @@ export default function BridgeView() {
               className={`chain-chip ${srcKey === s.key ? 'active' : ''}`}
               onClick={() => { setSrcKey(s.key); setQuote(null) }}
             >
-              <ChainIcon id={s.chain.id} name={s.name} size={15} />
+              <ChainIcon slug={s.key} name={s.name} size={15} />
               {s.name}
             </button>
           ))}
