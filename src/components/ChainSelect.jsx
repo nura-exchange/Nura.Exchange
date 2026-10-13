@@ -36,7 +36,9 @@ export function ChainIcon({ slug, name, size = 20 }) {
     )
   }
   return (
-    <img className="chain-ico" src={src} width={size} height={size} alt="" loading="lazy" onError={() => setErr(true)} />
+    <span className="chain-ico-wrap" style={{ width: size, height: size }}>
+      <img className="chain-ico" src={src} alt="" loading="lazy" onError={() => setErr(true)} />
+    </span>
   )
 }
 
