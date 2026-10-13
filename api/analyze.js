@@ -11,8 +11,9 @@ const DEC_SELECTOR = '0x313ce567' // decimals()
 const SUPPLY_SELECTOR = '0x18160ddd' // totalSupply()
 const BAL_SELECTOR = '0x70a08231' // balanceOf(address)
 
-const WINDOW = 3_000_000n // blocks of recent activity we sample for candidates
-const CHUNK = 1_500_000n // keep each eth_getLogs well under provider span caps
+const WINDOW = 3_000_000n // how far back we scan for candidate holders
+const CHUNK = 400_000n // block span per top-level eth_getLogs (split further if dense)
+const MAX_GATHER = 15000 // cap on Transfer logs we collect (recent-first) — plenty for top holders
 const CANDIDATES = 30 // top recipients we check exact balances for
 const BAL_CONCURRENCY = 10 // parallel balanceOf calls (avoid 429)
 const CACHE_TTL = 10 * 60 * 1000
@@ -34,15 +35,22 @@ function targets() {
 }
 
 async function rpcCall(url, method, params) {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  })
-  if (!r.ok) throw new Error(`rpc http ${r.status}`)
-  const j = await r.json()
-  if (j.error) throw new Error(j.error.message || 'rpc error')
-  return j.result
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    })
+    if (r.status === 429 || r.status >= 500) { // rate-limited / transient — retry once
+      if (attempt === 0) { await new Promise(res => setTimeout(res, 250)); continue }
+      throw new Error(`rpc http ${r.status}`)
+    }
+    if (!r.ok) throw new Error(`rpc http ${r.status}`)
+    const j = await r.json()
+    if (j.error) throw new Error(j.error.message || 'rpc error')
+    return j.result
+  }
+  throw new Error('rpc unavailable')
 }
 
 async function rpc(method, params) {
@@ -75,6 +83,29 @@ async function mapLimit(items, limit, fn) {
   })
   await Promise.all(workers)
   return out
+}
+
+const isLogLimitError = (e) => /exceeds limit|limit of|too many|\b10000\b/i.test(String((e && e.message) || e))
+
+// Fetch Transfer logs for [s, e], splitting the range in half whenever the
+// provider rejects it for exceeding its per-query log limit (>10k). Stops once
+// the shared collector hits MAX_GATHER. Newest-first so top recent holders win.
+async function gatherChunk(state, ca, s, e, depth) {
+  if (state.capped || state.logs.length >= MAX_GATHER) { state.capped = true; return }
+  try {
+    const logs = await getLogs(s, e, ca)
+    for (const lg of logs) {
+      state.logs.push(lg)
+      if (state.logs.length >= MAX_GATHER) { state.capped = true; return }
+    }
+  } catch (err) {
+    if (isLogLimitError(err) && e > s && depth < 16) {
+      const mid = (s + e) / 2n
+      await gatherChunk(state, ca, mid + 1n, e, depth + 1) // newer half first (prefer recent holders)
+      await gatherChunk(state, ca, s, mid, depth + 1)
+    }
+    // non-limit errors: skip this slice (partial data is better than failing)
+  }
 }
 
 function scoreOf({ concentration, largestShare, largestIsContract, holderCount }) {
@@ -122,16 +153,21 @@ async function analyze(ca) {
     }
   }
 
-  // Gather recent recipients (candidates), then read their true balances.
+  // Gather recent recipients (candidates), newest-first, adaptively splitting
+  // dense ranges so no single getLogs exceeds the provider's log limit.
   const start = latest > WINDOW ? latest - WINDOW : 0n
-  const ranges = []
-  for (let s = start; s <= latest; s += CHUNK) {
-    const e = s + CHUNK - 1n > latest ? latest : s + CHUNK - 1n
-    ranges.push([s, e])
+  const state = { logs: [], capped: false }
+  let e = latest
+  while (e > start && !state.capped) {
+    let s = e >= CHUNK ? e - CHUNK + 1n : 0n
+    if (s < start) s = start
+    await gatherChunk(state, ca, s, e, 0)
+    if (s <= start) break
+    e = s - 1n
   }
-  const batches = await Promise.all(ranges.map(([a, b]) => getLogs(a, b, ca).catch(() => [])))
+
   const received = new Map()
-  for (const lg of batches.flat()) {
+  for (const lg of state.logs) {
     const to = topicToAddr(lg.topics[2] || '0x')
     if (isZeroish(to)) continue
     let val = 0n

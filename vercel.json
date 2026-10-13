@@ -1,7 +1,8 @@
 {
   "rewrites": [],
   "functions": {
-    "api/tokens.js": { "maxDuration": 30 }
+    "api/tokens.js": { "maxDuration": 30 },
+    "api/analyze.js": { "maxDuration": 30 }
   },
   "headers": [
     {
