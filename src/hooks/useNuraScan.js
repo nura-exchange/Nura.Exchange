@@ -3,6 +3,13 @@ import { useEffect, useState, useCallback } from 'react'
 const POLL_MS = 1500
 const DEADLINE_MS = 75000
 
+// CrawlScan only scores tokens from known launchpads (Pons V2 / Flap / Bankr).
+// When it declines a token it says so deterministically — that's not a retryable
+// error, so we surface it as its own `unsupported` status.
+const isUnsupported = (msg) =>
+  typeof msg === 'string' &&
+  (/not a\s+\S+.*token/i.test(msg) || /unsupported|not recognized|unknown (launchpad|factory)/i.test(msg))
+
 // Starts a NuraScan (CrawlScan engine) for `ca` and polls until the verdict
 // is ready. Returns { status, result, message, retry }.
 // status: idle | starting | crawling | done | error
@@ -29,7 +36,11 @@ export function useNuraScan(ca) {
           if (!alive) return
           if (r.error && !r.done) { setState({ status: 'error', message: r.message || r.error }); return }
           if (r.done) {
-            if (r.error || !r.result) { setState({ status: 'error', message: r.error || 'Scan failed.' }); return }
+            if (r.error || !r.result) {
+              const msg = r.error || 'Scan failed.'
+              setState(isUnsupported(msg) ? { status: 'unsupported', message: msg } : { status: 'error', message: msg })
+              return
+            }
             setState({ status: 'done', result: r.result })
             return
           }

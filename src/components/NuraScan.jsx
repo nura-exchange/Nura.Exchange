@@ -21,6 +21,13 @@ const p0 = (x) => (x == null ? '—' : Math.round(x * 100))
 function Strip({ ca, onDetails }) {
   const { status, result, message, retry } = useNuraScan(ca)
 
+  if (status === 'unsupported') {
+    return (
+      <div className="nura-strip nura-strip--note">
+        <span>NuraScan: no automated scan for this token (not from a supported launchpad)</span>
+      </div>
+    )
+  }
   if (status === 'error') {
     return (
       <div className="nura-strip nura-strip--error">
@@ -77,6 +84,18 @@ function Full({ ca }) {
       <div className="nura">
         <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
         <div className="nura-crawling"><span className="nura-spider" />Crawling top holders onchain…</div>
+      </div>
+    )
+  }
+  if (status === 'unsupported') {
+    return (
+      <div className="nura">
+        <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
+        <div className="nura-unsupported">
+          <div className="nura-unsupported-title">No automated scan for this token</div>
+          <p className="nura-note">{message}</p>
+          <p className="nura-note dim">CrawlScan scores tokens created via Pons V2, Flap or Bankr launchpads. Tokens from other factories can’t be auto-analyzed yet.</p>
+        </div>
       </div>
     )
   }
