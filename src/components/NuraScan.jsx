@@ -1,8 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useNuraScan } from '../hooks/useNuraScan'
 import { addressUrl } from '../config'
-
-const POLL_MS = 1500
-const DEADLINE_MS = 75000
 
 const BAND_LABEL = {
   CLEAN: 'Clean',
@@ -13,62 +10,69 @@ const BAND_LABEL = {
   TOO_ESTABLISHED: 'Too established',
   TOO_ACTIVE: 'Too active',
 }
-const BAND_CLS = {
-  CLEAN: 'clean', OK: 'ok', RISKY: 'risky', DANGER: 'danger',
-}
-
+const BAND_CLS = { CLEAN: 'clean', OK: 'ok', RISKY: 'risky', DANGER: 'danger' }
 const RUG_KIND = { linked: 'linked wallets', transfer: 'received by transfer', virgin: 'fresh wallets', bundle: 'bundle / snipers' }
 
-function short(a) {
-  return typeof a === 'string' && a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : (a || '')
+const short = (a) => (typeof a === 'string' && a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : (a || ''))
+const impactPhrase = (impact) => (impact == null ? null : impact < 0.01 ? '<1%' : `−${Math.round(impact * 100)}%`)
+const p1 = (x) => (x == null ? '—' : (x * 100).toFixed(1))
+const p0 = (x) => (x == null ? '—' : Math.round(x * 100))
+
+function Strip({ ca, onDetails }) {
+  const { status, result, message, retry } = useNuraScan(ca)
+
+  if (status === 'error') {
+    return (
+      <div className="nura-strip nura-strip--error">
+        <span>NuraScan: {message}</span>
+        <button type="button" className="pill pill-ghost xs" onClick={retry}>Retry</button>
+      </div>
+    )
+  }
+  if (status !== 'done') {
+    return (
+      <div className="nura-strip">
+        <span className="nura-spider" />
+        <span className="nura-strip-label">NuraScan</span>
+        <span className="dim">Crawling top holders…</span>
+      </div>
+    )
+  }
+
+  const band = result.band
+  const cls = BAND_CLS[band] || 'neutral'
+  const m = result.metrics || {}
+  const ops = (result.operators || []).length
+  const impact = impactPhrase(m.impact)
+  const special = band === 'TOO_EARLY_OR_LATE' || band === 'TOO_ESTABLISHED' || band === 'TOO_ACTIVE'
+
+  return (
+    <div className="nura-strip">
+      <span className="nura-strip-label">NuraScan</span>
+      <span className={`nura-band ${cls}`}>{BAND_LABEL[band] || band}</span>
+      {result.score != null && <span className="nura-strip-score mono">{result.score}/100</span>}
+      {!special && (
+        <>
+          <span className="nura-strip-sep">·</span>
+          <span className="dim">{(result.holders_total || 0)} holders → {ops} op{ops === 1 ? '' : 's'}</span>
+          {impact && <><span className="nura-strip-sep">·</span><span className="dim">top op {impact}</span></>}
+          {result.rug && <span className="nura-strip-rug">⚠ rug −{Math.round((result.rug.drop || 0) * 100)}%</span>}
+        </>
+      )}
+      {onDetails && <button type="button" className="pill pill-ghost xs nura-strip-cta" onClick={onDetails}>Details</button>}
+    </div>
+  )
 }
-function impactPhrase(impact) {
-  if (impact == null) return '—'
-  return impact < 0.01 ? '<1%' : `−${Math.round(impact * 100)}%`
+
+export default function NuraScan({ ca, compact, onDetails }) {
+  if (compact) return <Strip ca={ca} onDetails={onDetails} />
+  return <Full ca={ca} />
 }
-function p1(x) { return x == null ? '—' : (x * 100).toFixed(1) }
-function p0(x) { return x == null ? '—' : Math.round(x * 100) }
 
-export default function NuraScan({ ca }) {
-  const [tick, setTick] = useState(0)
-  const [state, setState] = useState({ status: 'starting' })
+function Full({ ca }) {
+  const { status, result, message, retry } = useNuraScan(ca)
 
-  useEffect(() => {
-    let alive = true
-    let timer
-    setState({ status: 'starting' })
-    ;(async () => {
-      try {
-        const start = await fetch(`/api/nurascan?ca=${encodeURIComponent(ca)}`).then(r => r.json())
-        if (!alive) return
-        if (start.error) { setState({ status: 'error', message: start.message || start.error }); return }
-        const job = start.job
-        const deadline = Date.now() + DEADLINE_MS
-        const poll = async () => {
-          if (!alive) return
-          if (Date.now() > deadline) { setState({ status: 'error', message: 'The scan took too long. Try again.' }); return }
-          const r = await fetch(`/api/nurascan?job=${encodeURIComponent(job)}`).then(x => x.json()).catch(() => ({ error: 'unreachable' }))
-          if (!alive) return
-          if (r.error && !r.done) { setState({ status: 'error', message: r.message || r.error }); return }
-          if (r.done) {
-            if (r.error || !r.result) { setState({ status: 'error', message: r.error || 'Scan failed.' }); return }
-            setState({ status: 'done', result: r.result })
-            return
-          }
-          setState({ status: 'crawling' })
-          timer = setTimeout(poll, POLL_MS)
-        }
-        poll()
-      } catch {
-        if (alive) setState({ status: 'error', message: 'Scanner unreachable.' })
-      }
-    })()
-    return () => { alive = false; clearTimeout(timer) }
-  }, [ca, tick])
-
-  const retry = () => setTick(t => t + 1)
-
-  if (state.status === 'starting' || state.status === 'crawling') {
+  if (status === 'starting' || status === 'crawling') {
     return (
       <div className="nura">
         <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
@@ -76,27 +80,22 @@ export default function NuraScan({ ca }) {
       </div>
     )
   }
-
-  if (state.status === 'error') {
+  if (status === 'error') {
     return (
       <div className="nura">
         <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
-        <div className="nura-error">
-          {state.message}
-          <button type="button" className="pill pill-ghost xs" onClick={retry}>Retry</button>
-        </div>
+        <div className="nura-error">{message}<button type="button" className="pill pill-ghost xs" onClick={retry}>Retry</button></div>
       </div>
     )
   }
 
-  const r = state.result
+  const r = result
   const band = r.band
   const h = r.header || {}
   const m = r.metrics || {}
   const ops = r.operators || []
   const holders = r.holders || []
   const score = r.score
-
   const special = band === 'TOO_EARLY_OR_LATE' || band === 'TOO_ESTABLISHED' || band === 'TOO_ACTIVE'
   const cls = BAND_CLS[band] || 'neutral'
 

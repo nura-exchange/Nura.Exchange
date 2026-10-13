@@ -1055,6 +1055,24 @@ button { font-family: inherit; }
 
 /* ---- NuraScan panel (branded CrawlScan verdict) ---- */
 .scan-stack { display: flex; flex-direction: column; gap: 16px; }
+
+.nura-strip {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px 12px; margin-bottom: 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--raised);
+  font-size: 12px; color: var(--silver-2);
+}
+.nura-strip--error { color: var(--neg); border-color: rgba(229,103,91,0.35); }
+.nura-strip-label {
+  font-family: var(--font-display); font-weight: 600; font-size: 11px;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--pine-bright);
+}
+.nura-strip-score { color: var(--silver-bright); font-weight: 600; }
+.nura-strip-sep { color: var(--silver-3); }
+.nura-strip-rug { color: var(--neg); font-weight: 600; }
+.nura-strip-cta { margin-left: auto; }
+
 .nura {
   display: flex;
   flex-direction: column;
