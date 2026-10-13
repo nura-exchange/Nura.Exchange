@@ -1842,3 +1842,18 @@ button { font-family: inherit; }
 .quick-btn:hover:not(:disabled) { border-color: var(--pine-bright); color: var(--silver-bright); }
 .quick-btn:disabled { opacity: .35; cursor: not-allowed; }
 .quick-btn:focus-visible { outline: 2px solid var(--pine-bright); outline-offset: 2px; }
+
+/* US equity session badge in the Markets header */
+.session-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-full);
+  font: 500 10.5px var(--font-mono);
+  letter-spacing: .06em;
+  vertical-align: 1px;
+}
+.session-badge.sess-regular { color: var(--pine-bright); border-color: var(--pine-bright); }
+.session-badge.sess-extended { color: var(--warn); border-color: var(--warn); }
+.session-badge.sess-closed { color: var(--silver-3); }

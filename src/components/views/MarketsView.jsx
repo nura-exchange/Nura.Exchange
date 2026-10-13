@@ -3,6 +3,7 @@ import { useAppState } from '../../context/useAppState'
 import { useStocks, useEthPrice, useChainTokens } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
 import ChartModal from '../ChartModal'
+import { marketSession, SESSIONS } from '../../lib/session'
 
 function fmtPrice(n) {
   if (n === null || n === undefined) return '—'
@@ -48,6 +49,12 @@ export default function MarketsView() {
   const [updated, setUpdated] = useState(null)
   const [chainVisible, setChainVisible] = useState(150)
   const [chartTok, setChartTok] = useState(null)
+  const [session, setSession] = useState(() => marketSession())
+
+  useEffect(() => {
+    const i = setInterval(() => setSession(marketSession()), 60000)
+    return () => clearInterval(i)
+  }, [])
 
   function openChart(e, tok) {
     if (e.target.closest('button')) return
@@ -86,6 +93,7 @@ export default function MarketsView() {
           <p className="section-note">
             {stocks.length} tokenized stocks &amp; ETFs{chainTotal > 0 ? ` + ${chainTotal} more markets` : ''} live on Robinhood Chain · ETH {ethPrice ? `$${fmtPrice(ethPrice)}` : '—'} ·
             {' '}{gainers} up / {losers} down · updated {updated || '…'}
+            {' '}<span className={`session-badge sess-${session}`} title="US equity session (ET)">{SESSIONS[session].label}</span>
           </p>
         </div>
         <input

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import localStocks from '../data/stocks.json'
 import { USDG_ADDRESS, NATIVE } from '../config'
+import { useChainlinkPrices } from './useChainlink'
 
 // 64 Robinhood Chain stock tokens with live prices (Quoro open API, MIT-licensed data mirrored in src/data).
+// If the index is down, prices fall back to on-chain Chainlink feeds so Markets never renders empty.
 export function useStocks() {
+  const { prices: feedPrices } = useChainlinkPrices()
   const [stocks, setStocks] = useState(() =>
     localStocks.map(s => ({
       ticker: s.ticker,
@@ -40,7 +43,13 @@ export function useStocks() {
     return () => { alive = false }
   }, [])
 
-  return { stocks, loading }
+  // Chainlink fallback: fill any price the index didn't give us (or all of them, if it failed).
+  const stocksOut = stocks.map(s =>
+    s.priceUsd == null && feedPrices[s.ticker] != null ? { ...s, priceUsd: feedPrices[s.ticker] } : s
+  )
+  const loaded = !loading || stocksOut.some(s => s.priceUsd != null)
+
+  return { stocks: stocksOut, loading: !loaded }
 }
 
 // Every other live market on Robinhood Chain (top pools by 24h volume via /api/tokens),
@@ -77,6 +86,7 @@ export function useChainTokens() {
 }
 
 export function useEthPrice() {
+  const { prices: feedPrices } = useChainlinkPrices()
   const [price, setPrice] = useState(null)
   useEffect(() => {
     let alive = true
@@ -89,7 +99,7 @@ export function useEthPrice() {
     const i = setInterval(load, 60000)
     return () => { alive = false; clearInterval(i) }
   }, [])
-  return price
+  return price ?? feedPrices.ETH ?? null
 }
 
 export const USDG = {
