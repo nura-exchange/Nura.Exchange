@@ -1040,18 +1040,34 @@ button { font-family: inherit; }
   gap: 10px;
   flex-wrap: wrap;
 }
-.fav-toggle {
+.market-seg {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  color: var(--silver-2);
+  padding: 3px;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
 }
-.fav-toggle.active {
-  color: var(--warn);
-  border-color: rgba(217, 165, 74, 0.4);
-  background: rgba(217, 165, 74, 0.08);
+.market-seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--silver-3);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 6px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
 }
-.fav-toggle svg { flex: none; }
+.market-seg-btn:hover { color: var(--silver-bright); }
+.market-seg-btn.active {
+  color: var(--bg);
+  background: var(--pine-bright);
+}
 
 /* ---- NuraScan panel (branded CrawlScan verdict) ---- */
 .scan-stack { display: flex; flex-direction: column; gap: 16px; }
