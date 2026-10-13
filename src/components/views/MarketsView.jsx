@@ -91,7 +91,7 @@ export default function MarketsView() {
   const losers = stocks.filter(s => (s.change24h ?? 0) < 0).length
 
   const stocksTable = (list) => (
-    <div className="table-wrap reveal reveal-d1">
+    <div className="table-wrap">
       <table className="editorial-table">
         <thead>
           <tr>
@@ -130,7 +130,7 @@ export default function MarketsView() {
   )
 
   const chainTable = (list) => (
-    <div className="table-wrap reveal">
+    <div className="table-wrap">
       <table className="editorial-table">
         <thead>
           <tr>
@@ -223,7 +223,7 @@ export default function MarketsView() {
       {market === 'chain' && (chainLoading ? <TableSkeleton /> : chainTable(chainShown))}
 
       {market === 'chain' && !chainLoading && chainRows.length > chainShown.length && (
-        <div className="chain-more reveal">
+        <div className="chain-more">
           <button type="button" className="pill pill-ghost" onClick={() => setChainVisible(v => v + 150)}>
             Show 150 more · {chainRows.length - chainShown.length} left
           </button>
@@ -232,18 +232,18 @@ export default function MarketsView() {
 
       {market === 'favorites' && (
         !showFavStocks && !showFavChain
-          ? <div className="table-wrap reveal"><table className="editorial-table"><tbody><tr><td colSpan={7} className="empty-cell">{emptyMsg('')}</td></tr></tbody></table></div>
+          ? <div className="table-wrap"><table className="editorial-table"><tbody><tr><td colSpan={7} className="empty-cell">{emptyMsg('')}</td></tr></tbody></table></div>
           : (
             <>
               {showFavStocks && (
                 <>
-                  <div className="view-head reveal chain-head"><div><h2 className="subheading">Stocks</h2></div></div>
+                  <div className="view-head chain-head"><div><h2 className="subheading">Stocks</h2></div></div>
                   {stocksTable(favStocks)}
                 </>
               )}
               {showFavChain && (
                 <>
-                  <div className="view-head reveal chain-head"><div><h2 className="subheading">Memecoins</h2></div></div>
+                  <div className="view-head chain-head"><div><h2 className="subheading">Memecoins</h2></div></div>
                   {chainTable(favChain)}
                 </>
               )}
