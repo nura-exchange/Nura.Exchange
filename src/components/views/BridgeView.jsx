@@ -4,6 +4,7 @@ import { useAppState } from '../../context/useAppState'
 import { SOURCE_CHAINS, robinhoodChain, NATIVE, txUrl } from '../../config'
 import { getQuote, executeQuote, quoteError, remember, parseUnits, formatUnits } from '../../lib/trade'
 import ChainSelect, { ChainIcon } from '../ChainSelect'
+import { useNativeBalance } from '../../hooks/useTokenBalance'
 
 const SLIPPAGE = 0.5
 const DEAD = '0x000000000000000000000000000000000000dEaD'
@@ -28,7 +29,13 @@ export default function BridgeView() {
   const reqId = useRef(0)
 
   const source = useMemo(() => SOURCE_CHAINS.find(s => s.key === srcKey) || SOURCE_CHAINS[0], [srcKey])
+  const srcBal = useNativeBalance(source.chain.id)
   const parsed = amount ? (() => { try { return parseUnits(amount, 18) } catch { return 0n } })() : 0n
+
+  function setMax() {
+    const val = Math.max(srcBal.balance - 0.0005, 0) // leave a little for source-chain gas
+    setAmount(val > 0 ? String(Number(val.toFixed(6))) : '')
+  }
 
   useEffect(() => {
     setQuote(null)
@@ -131,7 +138,12 @@ export default function BridgeView() {
         <div className="field">
           <div className="field-top">
             <span className="label">From</span>
-            <span className="balance-line">You pay in {source.native}</span>
+            <span className="balance-line">
+              Balance: {isConnected ? `${fmt(srcBal.balance, 4)} ${source.native}` : '—'}
+              {isConnected && srcBal.balance > 0 && (
+                <button type="button" className="quick-btn" style={{ marginLeft: 8 }} onClick={setMax}>Max</button>
+              )}
+            </span>
           </div>
           <div className="field-row">
             <input
