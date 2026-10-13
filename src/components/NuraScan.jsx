@@ -11,15 +11,15 @@ const BAND_LABEL = {
   TOO_ACTIVE: 'Too active',
 }
 const BAND_CLS = { CLEAN: 'clean', OK: 'ok', RISKY: 'risky', DANGER: 'danger' }
-const RUG_KIND = { linked: 'linked wallets', transfer: 'received by transfer', virgin: 'fresh wallets', bundle: 'bundle / snipers' }
+const RUG_KIND = { linked: 'linked wallets', transfer: 'received by transfer', virgin: 'fresh wallets', bundle: 'bundle / snipers', whale: 'whale', deployer: 'deployer' }
 
 const short = (a) => (typeof a === 'string' && a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : (a || ''))
 const impactPhrase = (impact) => (impact == null ? null : impact < 0.01 ? '<1%' : `−${Math.round(impact * 100)}%`)
 const p1 = (x) => (x == null ? '—' : (x * 100).toFixed(1))
 const p0 = (x) => (x == null ? '—' : Math.round(x * 100))
 
-function Strip({ ca, onDetails }) {
-  const { status, result, message, retry } = useNuraScan(ca)
+function Strip({ ca, token, onDetails }) {
+  const { status, result, message, retry } = useNuraScan(ca, token)
 
   if (status === 'unsupported') {
     return (
@@ -71,13 +71,13 @@ function Strip({ ca, onDetails }) {
   )
 }
 
-export default function NuraScan({ ca, compact, onDetails }) {
-  if (compact) return <Strip ca={ca} onDetails={onDetails} />
-  return <Full ca={ca} />
+export default function NuraScan({ ca, token, compact, onDetails }) {
+  if (compact) return <Strip ca={ca} token={token} onDetails={onDetails} />
+  return <Full ca={ca} token={token} />
 }
 
-function Full({ ca }) {
-  const { status, result, message, retry } = useNuraScan(ca)
+function Full({ ca, token }) {
+  const { status, result, message, retry } = useNuraScan(ca, token)
 
   if (status === 'starting' || status === 'crawling') {
     return (
@@ -92,9 +92,9 @@ function Full({ ca }) {
       <div className="nura">
         <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
         <div className="nura-unsupported">
-          <div className="nura-unsupported-title">No automated scan for this token</div>
+          <div className="nura-unsupported-title">Scan unavailable for this token</div>
           <p className="nura-note">{message}</p>
-          <p className="nura-note dim">CrawlScan scores tokens created via Pons V2, Flap or Bankr launchpads. Tokens from other factories can’t be auto-analyzed yet.</p>
+          <p className="nura-note dim">CrawlScan only covers Pons V2, Flap or Bankr launchpads, and our on-chain pass couldn’t read this contract (non-standard token or RPC unavailable).</p>
         </div>
       </div>
     )
@@ -122,7 +122,9 @@ function Full({ ca }) {
     <div className="nura">
       <div className="nura-head">
         <span className="nura-brand">NuraScan</span>
-        <a className="nura-report" href={`https://crawlscan.fun/?ca=${r.token || ca}`} target="_blank" rel="noreferrer">Full report ↗</a>
+        {r.source !== 'nura' && (
+          <a className="nura-report" href={`https://crawlscan.fun/?ca=${r.token || ca}`} target="_blank" rel="noreferrer">Full report ↗</a>
+        )}
       </div>
 
       {(h.ticker || h.name) && (
@@ -203,7 +205,11 @@ function Full({ ca }) {
         </>
       )}
 
-      <div className="nura-source dim">Powered by CrawlScan engine · read-only · updated live</div>
+      <div className="nura-source dim">
+        {r.source === 'nura'
+          ? 'Nura on-chain analysis · read-only · updated live'
+          : 'Powered by CrawlScan engine · read-only · updated live'}
+      </div>
     </div>
   )
 }

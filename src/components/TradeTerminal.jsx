@@ -703,13 +703,13 @@ export default function TradeTerminal({ token, onClose }) {
             {tab === 'trade'
               ? (
                 <>
-                  {!isStock && <NuraScan ca={ca} compact onDetails={() => setTab('scan')} />}
+                  {!isStock && <NuraScan ca={ca} token={token} compact onDetails={() => setTab('scan')} />}
                   <TradeTicket token={token} onClose={onClose} />
                 </>
               )
               : (
                 <div className="scan-stack">
-                  {!isStock && <NuraScan ca={ca} />}
+                  {!isStock && <NuraScan ca={ca} token={token} />}
                   <SecurityScan token={token} />
                 </div>
               )}
