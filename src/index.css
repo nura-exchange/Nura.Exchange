@@ -1053,6 +1053,95 @@ button { font-family: inherit; }
 }
 .fav-toggle svg { flex: none; }
 
+/* ---- NuraScan panel (branded CrawlScan verdict) ---- */
+.scan-stack { display: flex; flex-direction: column; gap: 16px; }
+.nura {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel, 18px);
+  background: linear-gradient(180deg, var(--raised) 0%, var(--panel) 100%);
+}
+.nura-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.nura-brand {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pine-bright);
+}
+.nura-report { font-size: 12px; color: var(--silver-2); text-decoration: none; }
+.nura-report:hover { color: var(--silver-bright); }
+.nura-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--silver-bright); }
+
+.nura-crawling, .nura-error {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--silver-2);
+}
+.nura-error { color: var(--neg); flex-wrap: wrap; }
+.nura-spider {
+  width: 12px; height: 12px; border-radius: 999px; flex: none;
+  border: 2px solid var(--pine-dim); border-top-color: var(--pine-bright);
+  animation: nuraSpin 0.8s linear infinite;
+}
+@keyframes nuraSpin { to { transform: rotate(360deg); } }
+
+.nura-scoreline { display: flex; align-items: center; gap: 12px; }
+.nura-score {
+  display: flex; align-items: baseline; gap: 2px;
+  font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1;
+  color: var(--silver-bright);
+}
+.nura-score span { font-size: 13px; font-weight: 500; color: var(--silver-3); }
+.nura-score.clean { color: var(--pine-bright); }
+.nura-score.risky { color: var(--warn); }
+.nura-score.danger { color: var(--neg); }
+
+.nura-band {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 10px;
+  border-radius: var(--radius-full); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  border: 1px solid var(--line-2); color: var(--silver-2); background: var(--raised-2);
+}
+.nura-band.clean { color: var(--pine-bright); border-color: var(--pine-dim); background: rgba(63,158,116,0.10); }
+.nura-band.risky { color: var(--warn); border-color: rgba(217,165,74,0.4); background: rgba(217,165,74,0.08); }
+.nura-band.danger { color: var(--neg); border-color: rgba(229,103,91,0.4); background: rgba(229,103,91,0.08); }
+
+.nura-line { font-size: 13px; color: var(--silver); line-height: 1.5; }
+.nura-special { display: flex; flex-direction: column; gap: 8px; }
+.nura-note { font-size: 13px; color: var(--silver-2); line-height: 1.5; }
+
+.nura-rug {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(229,103,91,0.35); background: rgba(229,103,91,0.06);
+}
+.nura-rug-head { font-size: 13px; font-weight: 600; color: var(--neg); }
+.nura-rug-part { font-size: 12px; color: var(--silver-2); }
+
+.nura-signals { display: flex; flex-wrap: wrap; gap: 6px; }
+.nura-chip {
+  font-size: 11px; color: var(--silver-2);
+  padding: 3px 9px; border-radius: var(--radius-full);
+  border: 1px solid var(--line-2); background: var(--raised);
+}
+
+.nura-holders { display: flex; flex-direction: column; gap: 2px; }
+.nura-holder { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 4px 0; border-top: 1px solid var(--line); }
+.nura-holder:first-child { border-top: none; }
+.nura-holder-addr { color: var(--silver); text-decoration: none; flex: none; }
+.nura-holder-addr:hover { color: var(--silver-bright); }
+.nura-holder-share { margin-left: auto; color: var(--silver-bright); }
+.nura-holder-flags { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); flex: none; }
+
+.nura-why { display: flex; flex-direction: column; gap: 3px; }
+.nura-why-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--silver-3); margin-bottom: 2px; }
+.nura-why-line { font-size: 12px; color: var(--silver-2); }
+.nura-source { font-size: 11px; }
+
 .spark { color: var(--silver-2); display: block; }
 
 .empty-cell {

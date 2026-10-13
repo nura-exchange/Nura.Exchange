@@ -12,6 +12,7 @@ import ChartSvg from './PriceChart'
 import { RANGES, fmtPrice, fmtVol } from '../lib/chart'
 import { useCandles } from '../hooks/useCandles'
 import { marketSession, SESSIONS } from '../lib/session'
+import NuraScan from './NuraScan'
 
 const SLIPPAGE = 1
 const QUORO = 'https://quoro.exchange'
@@ -701,7 +702,12 @@ export default function TradeTerminal({ token, onClose }) {
             </div>
             {tab === 'trade'
               ? <TradeTicket token={token} onClose={onClose} />
-              : <SecurityScan token={token} />}
+              : (
+                <div className="scan-stack">
+                  {!isStock && <NuraScan ca={ca} />}
+                  <SecurityScan token={token} />
+                </div>
+              )}
           </aside>
         </div>
       </div>
