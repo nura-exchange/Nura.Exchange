@@ -3,6 +3,7 @@ import { useAccount } from 'wagmi'
 import { useAppState } from '../../context/useAppState'
 import { SOURCE_CHAINS, robinhoodChain, NATIVE, txUrl } from '../../config'
 import { getQuote, executeQuote, quoteError, remember, parseUnits, formatUnits } from '../../lib/trade'
+import ChainSelect, { ChainIcon } from '../ChainSelect'
 
 const SLIPPAGE = 0.5
 const DEAD = '0x000000000000000000000000000000000000dEaD'
@@ -140,17 +141,11 @@ export default function BridgeView() {
               value={amount}
               onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
             />
-            <div className="token-picker">
-              <select
-                className="chain-select"
-                value={srcKey}
-                onChange={e => { setSrcKey(e.target.value); setQuote(null) }}
-              >
-                {SOURCE_CHAINS.map(s => (
-                  <option key={s.key} value={s.key}>{s.name} ({s.native})</option>
-                ))}
-              </select>
-            </div>
+            <ChainSelect
+              chains={SOURCE_CHAINS}
+              value={srcKey}
+              onChange={k => { setSrcKey(k); setQuote(null) }}
+            />
           </div>
         </div>
 
@@ -208,6 +203,7 @@ export default function BridgeView() {
               className={`chain-chip ${srcKey === s.key ? 'active' : ''}`}
               onClick={() => { setSrcKey(s.key); setQuote(null) }}
             >
+              <ChainIcon id={s.chain.id} name={s.name} size={15} />
               {s.name}
             </button>
           ))}

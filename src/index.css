@@ -848,22 +848,43 @@ button { font-family: inherit; }
 .picker-name { font-size: 12px; color: var(--silver-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-price { font-size: 12px; color: var(--silver); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-.chain-select {
+.chain-select { position: relative; }
+.chain-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   border: 1px solid var(--line-2);
   border-radius: var(--radius-sm);
   background: var(--raised);
   color: var(--silver-bright);
   font-family: var(--font-sans);
   font-size: var(--text-caption);
-  padding: 9px 12px;
+  padding: 8px 12px;
   cursor: pointer;
   outline: none;
   transition: border-color var(--dur) var(--ease);
 }
+.chain-select-btn:hover { border-color: var(--line-3); }
+.chain-select-btn:focus-visible { border-color: var(--pine-bright); }
+.chain-select-name { font-weight: var(--font-weight-semibold); }
+.chain-select-native { color: var(--silver-3); font-size: 11px; font-family: var(--font-mono); }
 
-.chain-select:hover { border-color: var(--line-3); }
-.chain-select:focus { border-color: var(--pine-bright); }
-.chain-select option { background: var(--panel); color: var(--silver-bright); }
+.chain-ico { border-radius: 50%; flex: none; display: block; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.chain-ico-fb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--raised);
+  border: 1px solid var(--line-2);
+  color: var(--silver-bright);
+  font-weight: 700;
+  flex: none;
+}
+.chain-menu { width: 260px; }
+.chain-menu .picker-item { align-items: center; gap: 10px; }
+.chain-menu .picker-name { font-size: 13px; color: var(--silver-bright); }
+.chain-menu .picker-item.active .picker-name { color: var(--pine-bright); }
 
 .chain-grid {
   display: flex;
@@ -873,12 +894,15 @@ button { font-family: inherit; }
 }
 
 .chain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 1px solid var(--line-3);
   border-radius: var(--radius-tags);
   background: transparent;
   color: var(--silver);
   font-size: 11px;
-  padding: 5px 16px;
+  padding: 5px 12px;
   cursor: pointer;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
