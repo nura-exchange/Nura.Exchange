@@ -2044,7 +2044,7 @@ button { font-family: inherit; }
 
 /* Reusable dot-grid texture (neutral silver dots, never tinted) */
 .dot-grid {
-  background-image: radial-gradient(circle, rgba(200, 207, 209, 0.055) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(200, 207, 209, 0.13) 1px, transparent 1px);
   background-size: 22px 22px;
 }
 
@@ -2055,10 +2055,10 @@ button { font-family: inherit; }
   position: absolute;
   inset: 0;
   z-index: 0;
-  background-image: radial-gradient(circle, rgba(200, 207, 209, 0.05) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(200, 207, 209, 0.14) 1.1px, transparent 1.1px);
   background-size: 22px 22px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 15%, transparent 78%);
-  mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 15%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 25%, transparent 88%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 25%, transparent 88%);
   pointer-events: none;
 }
 .tt-panel > * { position: relative; z-index: 1; }
@@ -2067,32 +2067,33 @@ button { font-family: inherit; }
 .micro-label {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font: 500 10px var(--font-mono);
+  gap: 8px;
+  font: 500 11px var(--font-mono);
   letter-spacing: var(--track-micro);
   text-transform: uppercase;
-  color: var(--silver-3);
+  color: var(--silver-2);
 }
 .live-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--pine-bright);
+  box-shadow: 0 0 8px rgba(63, 158, 116, 0.7);
   animation: livePulse 2.2s var(--ease) infinite;
 }
 @keyframes livePulse {
-  0% { box-shadow: 0 0 0 0 rgba(63, 158, 116, 0.5); }
-  70% { box-shadow: 0 0 0 6px rgba(63, 158, 116, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(63, 158, 116, 0.6); }
+  70% { box-shadow: 0 0 0 7px rgba(63, 158, 116, 0); }
   100% { box-shadow: 0 0 0 0 rgba(63, 158, 116, 0); }
 }
-.chart-eyebrow { margin-bottom: 6px; }
+.chart-eyebrow { margin-bottom: 7px; }
 
 /* Pine glow halo behind active pills — ties the accent without a new hue */
 .tt-tab.active,
 .range-tab.active {
   box-shadow:
-    0 0 0 1px rgba(63, 158, 116, 0.22),
-    0 8px 22px -10px rgba(63, 158, 116, 0.55);
+    0 0 0 1px rgba(63, 158, 116, 0.35),
+    0 8px 24px -8px rgba(63, 158, 116, 0.75);
 }
 
 @media (prefers-reduced-motion: reduce) {
