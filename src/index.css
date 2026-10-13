@@ -2028,6 +2028,8 @@ button { font-family: inherit; }
 .fact-k { font-size: 11px; color: var(--silver-3); }
 .fact-v { font-size: 13.5px; color: var(--silver-bright); }
 .fact-v.bad { color: var(--neg); }
+.fact-v a { color: inherit; text-decoration: none; transition: color .15s ease; }
+.fact-v a:hover { color: var(--pine-bright); }
 
 .scan-links { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; }
 .scan-links a { color: var(--silver-2); transition: color .15s ease; }

@@ -5,8 +5,9 @@ import { useAppState } from '../context/useAppState'
 import { useEthPrice, ETH_TOKEN, USDG } from '../hooks/useMarkets'
 import { useTokenBalance, useNativeBalance } from '../hooks/useTokenBalance'
 import { useExecuteSwap } from '../hooks/useExecuteSwap'
-import { USDG_ADDRESS, robinhoodChain } from '../config'
+import { USDG_ADDRESS, robinhoodChain, txUrl } from '../config'
 import { getQuote, quoteError, remember, parseUnits, formatUnits } from '../lib/trade'
+import { getQuoroQuote, normalizeQuoro, executeQuoroQuote } from '../lib/quoro'
 import ChartSvg from './PriceChart'
 import { RANGES, fmtPrice, fmtVol } from '../lib/chart'
 import { useCandles } from '../hooks/useCandles'
@@ -43,14 +44,16 @@ function TradeTicket({ token, onClose }) {
   const [decimals, setDecimals] = useState(token.decimals ?? 18)
   const [amountIn, setAmountIn] = useState('')
   const [quote, setQuote] = useState(null)
+  const [quoro, setQuoro] = useState(null)
   const [quoting, setQuoting] = useState(false)
   const [quoteErr, setQuoteErr] = useState(null)
   const [lastResult, setLastResult] = useState(null)
+  const [qxStatus, setQxStatus] = useState(null)
   const reqId = useRef(0)
   const executingRef = useRef(false)
 
   const { execute, status, busy, reset: resetSwap } = useExecuteSwap()
-  const phase = status?.phase ?? null
+  const phase = qxStatus?.phase ?? status?.phase ?? null
 
   const tokenAddr = token.ca || token.address
   const tokenSym = token.symbol || token.ticker
@@ -98,6 +101,7 @@ function TradeTicket({ token, onClose }) {
     const f = 10 ** dec
     setAmountIn(v > 0 ? String(Math.floor(v * f) / f) : '')
     setQuote(null)
+    setQuoro(null)
     setQuoteErr(null)
   }
 
@@ -106,6 +110,7 @@ function TradeTicket({ token, onClose }) {
     setSide(next)
     setAmountIn('')
     setQuote(null)
+    setQuoro(null)
     setQuoteErr(null)
     setLastResult(null)
   }
@@ -120,15 +125,18 @@ function TradeTicket({ token, onClose }) {
   const sameToken = fromToken.address?.toLowerCase() === toToken.address?.toLowerCase()
 
   // Market quote on Robinhood Chain only — cross-chain lives in the Swap view.
+  // Quoro's server knows bonding-curve launches and v4 pools; LI.FI covers everything
+  // else — race both and keep the better output.
   useEffect(() => {
     setQuote(null)
+    setQuoro(null)
     setQuoteErr(null)
     if (!tokenAddr || parsedIn <= 0n || sameToken) return
     const id = ++reqId.current
     const from = address || '0x000000000000000000000000000000000000dEaD'
     setQuoting(true)
     const t = setTimeout(() => {
-      getQuote({
+      const lifi = getQuote({
         fromChain: robinhoodChain.id,
         toChain: robinhoodChain.id,
         fromToken: fromToken.address,
@@ -137,27 +145,52 @@ function TradeTicket({ token, onClose }) {
         fromAddress: from,
         slippage: SLIPPAGE,
       })
-        .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
-        .catch(e => { if (id === reqId.current) setQuoteErr(quoteError(e)) })
-        .finally(() => { if (id === reqId.current) setQuoting(false) })
+        .then(q => ({ ok: true, q }))
+        .catch(e => ({ ok: false, e }))
+      const canQuoro = side === 'sell' || paySel === 'ETH'
+      const qq = canQuoro
+        ? getQuoroQuote({ ca: tokenAddr, side, amount: formatUnits(parsedIn, payDecimals), account: address || undefined, slippage: SLIPPAGE })
+            .then(q => ({ ok: true, q }))
+            .catch(() => ({ ok: false }))
+        : Promise.resolve({ skip: true })
+      Promise.all([lifi, qq]).then(([l, q]) => {
+        if (id !== reqId.current) return
+        setQuoting(false)
+        if (l.ok) { setQuote(l.q); setQuoteErr(null) } else setQuoteErr(quoteError(l.e))
+        if (q.ok) setQuoro(normalizeQuoro(q.q))
+      })
     }, 550)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amountIn, tokenAddr, fromToken.address, toToken.address, address, sameToken, decimals, side, paySel])
 
-  const hasQuote = !!quote
-  const outAmount = quote?.estimate?.toAmount
+  const lifiOut = quote?.estimate?.toAmount
     ? formatUnits(BigInt(quote.estimate.toAmount), toToken?.decimals ?? 18)
     : null
-  const minAmount = quote?.estimate?.toAmountMin
-    ? formatUnits(BigInt(quote.estimate.toAmountMin), toToken?.decimals ?? 18)
-    : null
-  const gasUsd = quote?.estimate?.gasCosts?.find(g => g.amountUSD)?.amountUSD
-  const feeUsd = gasUsd ? parseFloat(gasUsd) : null
-  const impact = quote?.estimate?.priceImpact ?? quote?.impact ?? null
-  const routeLabel = quote?.toolDetails?.name || quote?.tool || null
+  const quoroOutN = quoro?.out != null ? parseFloat(quoro.out) : null
+  const lifiOutN = lifiOut != null ? parseFloat(lifiOut) : null
+  // quoro wins when it is the only route (bonding curve) or returns at least as much
+  const useQuoro = quoroOutN != null && (lifiOutN == null || quoroOutN >= lifiOutN)
+  const err = useQuoro ? null : quoteErr
 
-  const swapBusyLocal = busy || ['switch', 'approve', 'sign', 'pending', 'delivering'].includes(phase)
+  const hasQuote = useQuoro || !!quote
+  const outAmount = useQuoro ? quoro.out : lifiOut
+  const minAmount = useQuoro
+    ? quoro.outMin
+    : (quote?.estimate?.toAmountMin ? formatUnits(BigInt(quote.estimate.toAmountMin), toToken?.decimals ?? 18) : null)
+  const feeUsd = useQuoro
+    ? quoro.feeUsd
+    : (quote?.estimate?.gasCosts?.find(g => g.amountUSD)?.amountUSD
+      ? parseFloat(quote.estimate.gasCosts.find(g => g.amountUSD).amountUSD)
+      : null)
+  const impact = useQuoro ? quoro.impactPct : (quote?.estimate?.priceImpact ?? quote?.impact ?? null)
+  const routeLabel = useQuoro
+    ? (quoro.provider === 'relay' ? 'Relay' : quoro.provider === 'lifi' ? 'LI.FI' : 'Quoro')
+    : (quote?.toolDetails?.name || quote?.tool || null)
+  const taxPct = useQuoro ? quoro.taxPct : 0
+
+  const qxBusy = qxStatus != null && qxStatus.phase !== 'done'
+  const swapBusyLocal = busy || qxBusy || ['switch', 'approve', 'sign', 'pending', 'delivering'].includes(phase)
   const phaseLabel = {
     approve: 'Approving token…',
     sign: 'Confirm in wallet…',
@@ -173,7 +206,17 @@ function TradeTicket({ token, onClose }) {
     executingRef.current = true
     setLastResult(null)
     try {
-      const res = await execute({ originChainId: robinhoodChain.id, quote, relayQuote: null })
+      let res
+      if (useQuoro) {
+        // steps are bound to the account and short-lived: re-quote at signing time
+        const fresh = await getQuoroQuote({ ca: tokenAddr, side, amount: amountIn, account: address, slippage: SLIPPAGE })
+        if (!fresh.signable || !fresh.steps?.length) throw new Error('Quote expired — try again')
+        setQxStatus({ phase: 'switch' })
+        const hash = await executeQuoroQuote(fresh, { connector, account: address, onStatus: s => setQxStatus(s) })
+        res = { txHash: hash, url: txUrl(hash) }
+      } else {
+        res = await execute({ originChainId: robinhoodChain.id, quote, relayQuote: null })
+      }
       remember(address, {
         ts: Date.now(),
         side: 'swap',
@@ -202,6 +245,7 @@ function TradeTicket({ token, onClose }) {
       notify('Trade Failed', quoteError(e), 'error')
     } finally {
       executingRef.current = false
+      setQxStatus(null)
       resetSwap()
     }
   }
@@ -243,7 +287,7 @@ function TradeTicket({ token, onClose }) {
                   key={sym}
                   type="button"
                   className={`pill token-pill ${paySel === sym ? 'active' : ''}`}
-                  onClick={() => { setPaySel(sym); setQuote(null); setQuoteErr(null) }}
+                  onClick={() => { setPaySel(sym); setQuote(null); setQuoro(null); setQuoteErr(null) }}
                 >
                   {sym}
                 </button>
@@ -284,17 +328,18 @@ function TradeTicket({ token, onClose }) {
         </div>
         <div className="field-note">
           {quoting && 'Finding best price…'}
-          {!quoting && quoteErr && quoteErr}
-          {!quoting && !quoteErr && hasQuote && (
+          {!quoting && err && err}
+          {!quoting && !err && hasQuote && (
             <>1 {fromToken.symbol} ≈ {fmt(parseFloat(outAmount || '0') / parseFloat(amountIn || '1'), 4)} {toToken?.symbol} · route: {routeLabel}</>
           )}
         </div>
       </div>
 
-      {hasQuote && !quoteErr && (
+      {hasQuote && !err && (
         <div className="quote-lines">
           <div className="q-line"><span>Minimum received</span><span>{fmt(parseFloat(minAmount || '0'), 6)} {toToken?.symbol}</span></div>
           <div className="q-line"><span>Network fee</span><span>{feeUsd != null ? `$${fmt(feeUsd, 2)}` : '—'}</span></div>
+          {taxPct > 0 && <div className="q-line"><span>Creator tax</span><span>{taxPct}%</span></div>}
           {impact != null && <div className="q-line"><span>Price impact</span><span>{fmt(parseFloat(impact), 2)}%</span></div>}
           <div className="q-line"><span>Slippage</span><span>{SLIPPAGE}%</span></div>
         </div>
@@ -310,7 +355,7 @@ function TradeTicket({ token, onClose }) {
           : swapBusyLocal ? phaseLabel
             : !amountIn ? (side === 'buy' ? 'Enter an amount' : 'Enter tokens to sell')
               : tooBig ? 'Insufficient balance'
-                : quoteErr ? 'No route — try again'
+                : err ? 'No route — try again'
                   : !hasQuote ? 'Fetching quote…'
                     : side === 'buy' ? `Buy ${tokenSym} with ${fromToken.symbol}`
                       : `Sell ${tokenSym} for ETH`}
@@ -337,6 +382,7 @@ function SecurityScan({ token }) {
   const ca = token.ca || token.address
   const [tick, setTick] = useState(0)
   const [state, setState] = useState({ status: 'loading' })
+  const [lp, setLp] = useState({ status: 'loading' })
 
   useEffect(() => {
     let alive = true
@@ -349,6 +395,16 @@ function SecurityScan({ token }) {
         else setState({ status: 'ready', data: d })
       })
       .catch(() => { if (alive) setState({ status: 'error' }) })
+    return () => { alive = false }
+  }, [ca, tick])
+
+  useEffect(() => {
+    let alive = true
+    setLp({ status: 'loading' })
+    fetch(`/api/launchpad?ca=${ca}`)
+      .then(r => r.json())
+      .then(d => { if (alive) setLp({ status: 'ready', data: d }) })
+      .catch(() => { if (alive) setLp({ status: 'error' }) })
     return () => { alive = false }
   }, [ca, tick])
 
@@ -469,6 +525,38 @@ function SecurityScan({ token }) {
           {d.ageMin != null && <div className="fact"><span className="fact-k">Age</span><span className="fact-v mono">{fmtAge(d.ageMin)}</span></div>}
           {d.curvePct != null && <div className="fact"><span className="fact-k">Curve</span><span className="fact-v mono">{d.graduated ? 'Graduated' : `${d.curvePct}%`}</span></div>}
         </div>
+      </div>
+
+      <div className="scan-section">
+        <div className="scan-title">Launchpad</div>
+        {lp.status === 'loading' && <div className="dim">Checking token creator…</div>}
+        {lp.status === 'error' && <div className="dim">Creator lookup unavailable.</div>}
+        {lp.status === 'ready' && (lp.data?.launchpad ? (
+          <>
+            <div className="scan-verdict good">Launched via {lp.data.launchpad}</div>
+            <div className="scan-facts">
+              {lp.data.creator && (
+                <div className="fact">
+                  <span className="fact-k">Creator</span>
+                  <a className="fact-v mono" href={`https://robinhoodchain.blockscout.com/address/${lp.data.creator}`} target="_blank" rel="noreferrer">
+                    {lp.data.creator.slice(0, 6)}…{lp.data.creator.slice(-4)} ↗
+                  </a>
+                </div>
+              )}
+              {lp.data.factory && (
+                <div className="fact">
+                  <span className="fact-k">Factory</span>
+                  <a className="fact-v mono" href={`https://robinhoodchain.blockscout.com/address/${lp.data.factory}`} target="_blank" rel="noreferrer">
+                    {lp.data.factory.slice(0, 6)}…{lp.data.factory.slice(-4)} ↗
+                  </a>
+                </div>
+              )}
+              {lp.data.contractName && <div className="fact"><span className="fact-k">Contract</span><span className="fact-v mono">{lp.data.contractName}</span></div>}
+            </div>
+          </>
+        ) : (
+          <p className="scan-note">Not created by a known launchpad factory — unknown origin.</p>
+        ))}
       </div>
 
       {d.socials && (d.socials.x || d.socials.site || d.socials.tg) && (
