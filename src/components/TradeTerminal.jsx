@@ -582,7 +582,7 @@ function SecurityScan({ token }) {
 
 export default function TradeTerminal({ token, onClose }) {
   const [range, setRange] = useState('1D')
-  const [tab, setTab] = useState('trade')
+  const [tab, setTab] = useState(token.ticker ? 'trade' : 'scan')
   const ca = token.ca || token.address
   const { status, candles, pool, retry } = useCandles(ca, range)
   const [session, setSession] = useState(() => marketSession())
