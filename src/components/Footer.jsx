@@ -17,6 +17,7 @@ export default function Footer() {
           <a href="https://github.com/nura-exchange/Nura.Exchange" target="_blank" rel="noreferrer">GitHub</a>
           <a href="https://robinhoodchain.blockscout.com" target="_blank" rel="noreferrer">Explorer</a>
           <a href="https://quoro.exchange/docs" target="_blank" rel="noreferrer">API</a>
+          <a href="https://x.com/NuraExchange" target="_blank" rel="noreferrer">X</a>
         </div>
       </div>
       <div className="ft-base container">
