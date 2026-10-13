@@ -103,8 +103,10 @@ async function gatherChunk(state, ca, s, e, depth) {
       const mid = (s + e) / 2n
       await gatherChunk(state, ca, mid + 1n, e, depth + 1) // newer half first (prefer recent holders)
       await gatherChunk(state, ca, s, mid, depth + 1)
+    } else {
+      // transient failure (e.g. 429) — record it so we don't trust an empty result
+      state.sliceErrors = (state.sliceErrors || 0) + 1
     }
-    // non-limit errors: skip this slice (partial data is better than failing)
   }
 }
 
@@ -156,7 +158,7 @@ async function analyze(ca) {
   // Gather recent recipients (candidates), newest-first, adaptively splitting
   // dense ranges so no single getLogs exceeds the provider's log limit.
   const start = latest > WINDOW ? latest - WINDOW : 0n
-  const state = { logs: [], capped: false }
+  const state = { logs: [], capped: false, sliceErrors: 0 }
   let e = latest
   while (e > start && !state.capped) {
     let s = e >= CHUNK ? e - CHUNK + 1n : 0n
@@ -164,6 +166,11 @@ async function analyze(ca) {
     await gatherChunk(state, ca, s, e, 0)
     if (s <= start) break
     e = s - 1n
+  }
+  // Empty gather that coincided with RPC failures is unreliable — surface a
+  // retryable error instead of a confident "no holders" (which would be cached).
+  if (state.logs.length === 0 && state.sliceErrors > 0) {
+    throw new Error('rate limited while scanning holders — try again')
   }
 
   const received = new Map()

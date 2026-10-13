@@ -56,7 +56,10 @@ export function useNuraScan(ca, token) {
           const a = await fetch(`/api/analyze?ca=${encodeURIComponent(ca)}`).then(r => r.json())
           if (!alive) return
           if (a && !a.error) { setState({ status: 'done', result: mapAnalyze(a, ca, symbol, name) }); return }
-          setState({ status: 'unsupported', message: (a && a.error) || 'No automated scan for this token.' })
+          const msg = (a && a.error) || 'No automated scan for this token.'
+          // Transient RPC failures are retryable; permanent ones (non-ERC20) aren't.
+          if (/rate limit|try again|unreachable|http \d/i.test(msg)) setState({ status: 'error', message: msg })
+          else setState({ status: 'unsupported', message: msg })
         } catch {
           if (alive) setState({ status: 'unsupported', message: 'No automated scan for this token.' })
         }
