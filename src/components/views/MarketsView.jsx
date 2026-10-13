@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useAppState } from '../../context/useAppState'
 import { useStocks, useEthPrice, useChainTokens } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
-import ChartModal from '../ChartModal'
+import TradeTerminal from '../TradeTerminal'
 import { marketSession, SESSIONS } from '../../lib/session'
 
 function fmtPrice(n) {
@@ -41,14 +40,13 @@ function Spark({ data }) {
 }
 
 export default function MarketsView() {
-  const { setActiveTab, setSwapPrefill } = useAppState()
   const { stocks, loading } = useStocks()
   const { chainTokens, loading: chainLoading } = useChainTokens()
   const ethPrice = useEthPrice()
   const [filter, setFilter] = useState('')
   const [updated, setUpdated] = useState(null)
   const [chainVisible, setChainVisible] = useState(150)
-  const [chartTok, setChartTok] = useState(null)
+  const [termTok, setTermTok] = useState(null)
   const [session, setSession] = useState(() => marketSession())
 
   useEffect(() => {
@@ -58,7 +56,7 @@ export default function MarketsView() {
 
   function openChart(e, tok) {
     if (e.target.closest('button')) return
-    setChartTok(tok)
+    setTermTok(tok)
   }
 
   useEffect(() => {
@@ -80,13 +78,12 @@ export default function MarketsView() {
   const chainShown = chainRows.slice(0, chainVisible)
 
   function trade(tok) {
-    setSwapPrefill({ to: { ...tok, symbol: tok.symbol || tok.ticker, address: tok.ca || tok.address, decimals: tok.decimals ?? null } })
-    setActiveTab('Swap')
+    setTermTok(tok)
   }
 
   return (
     <div className="container view">
-      {chartTok && <ChartModal token={chartTok} onClose={() => setChartTok(null)} />}
+      {termTok && <TradeTerminal token={termTok} onClose={() => setTermTok(null)} />}
       <div className="view-head row reveal">
         <div>
           <h1 className="section-heading">Markets</h1>
