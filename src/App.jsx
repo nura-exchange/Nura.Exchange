@@ -106,7 +106,7 @@ function Page() {
     <div className="page">
       <ScrollProgress />
       <Navbar />
-      <WrongNetworkBanner />
+      {activeTab !== 'Bridge' && <WrongNetworkBanner />}
       <div className="page-body">
         {activeTab === 'Markets' && <Hero />}
         <ErrorBoundary>

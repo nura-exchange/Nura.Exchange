@@ -1,12 +1,13 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { useAccount } from 'wagmi'
+import { useAccount, useChainId } from 'wagmi'
 import { useAppState } from '../context/useAppState'
 import { useNativeBalance } from '../hooks/useTokenBalance'
 
 export default function Navbar() {
   const { activeTab, setActiveTab, tabs } = useAppState()
   const { isConnected } = useAccount()
-  const native = useNativeBalance()
+  const chainId = useChainId()
+  const native = useNativeBalance(chainId)
 
   return (
     <header className="nav-header">
