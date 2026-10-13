@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { loadFavorites, saveFavorites, toggleFav } from '../lib/favorites'
 
 const TABS = ['Markets', 'Swap', 'Bridge', 'Portfolio', 'History', 'News', 'Docs']
 
@@ -8,7 +9,21 @@ export function AppProvider({ children }) {
   const [activeTab, setActiveTab] = useState('Markets')
   const [swapPrefill, setSwapPrefill] = useState(null)
   const [notifications, setNotifications] = useState([])
+  const [favorites, setFavorites] = useState(loadFavorites)
   const notifId = useRef(0)
+
+  const toggleFavorite = useCallback((ca) => {
+    setFavorites(prev => {
+      const next = toggleFav(prev, ca)
+      saveFavorites(next)
+      return next
+    })
+  }, [])
+
+  const isFavorite = useCallback((ca) => {
+    const c = String(ca || '').toLowerCase()
+    return c ? favorites.includes(c) : false
+  }, [favorites])
 
   const notify = useCallback((title, message, type = 'info') => {
     const id = ++notifId.current
@@ -22,7 +37,7 @@ export function AppProvider({ children }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ activeTab, setActiveTab, swapPrefill, setSwapPrefill, tabs: TABS, notifications, notify, dismissNotification }}>
+    <AppContext.Provider value={{ activeTab, setActiveTab, swapPrefill, setSwapPrefill, tabs: TABS, notifications, notify, dismissNotification, favorites, toggleFavorite, isFavorite }}>
       {children}
     </AppContext.Provider>
   )

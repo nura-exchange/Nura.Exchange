@@ -3,6 +3,8 @@ import { useStocks, useEthPrice, useChainTokens } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
 import TradeTerminal from '../TradeTerminal'
 import { marketSession, SESSIONS } from '../../lib/session'
+import { useAppState } from '../../context/useAppState'
+import { TokenLogo, VerifiedBadge, StarButton } from '../TokenBadge'
 
 function fmtPrice(n) {
   if (n === null || n === undefined) return '—'
@@ -43,7 +45,9 @@ export default function MarketsView() {
   const { stocks, loading } = useStocks()
   const { chainTokens, loading: chainLoading } = useChainTokens()
   const ethPrice = useEthPrice()
+  const { isFavorite } = useAppState()
   const [filter, setFilter] = useState('')
+  const [favOnly, setFavOnly] = useState(false)
   const [updated, setUpdated] = useState(null)
   const [chainVisible, setChainVisible] = useState(150)
   const [termTok, setTermTok] = useState(null)
@@ -64,6 +68,7 @@ export default function MarketsView() {
   }, [loading, stocks])
 
   const rows = stocks
+    .filter(s => !favOnly || isFavorite(s.ca))
     .filter(s => !filter || s.ticker.toLowerCase().includes(filter.toLowerCase()) || s.name.toLowerCase().includes(filter.toLowerCase()))
     .sort((a, b) => (b.change24h ?? -Infinity) - (a.change24h ?? -Infinity))
 
@@ -74,6 +79,7 @@ export default function MarketsView() {
   const chainTotal = chainTokens.filter(t => !stockCas.has((t.ca || '').toLowerCase())).length
   const chainRows = chainTokens
     .filter(t => !stockCas.has((t.ca || '').toLowerCase()))
+    .filter(t => !favOnly || isFavorite(t.ca))
     .filter(t => !filter || t.symbol.toLowerCase().includes(filter.toLowerCase()) || t.name.toLowerCase().includes(filter.toLowerCase()))
   const chainShown = chainRows.slice(0, chainVisible)
 
@@ -93,12 +99,25 @@ export default function MarketsView() {
             {' '}<span className={`session-badge sess-${session}`} title="US equity session (ET)">{SESSIONS[session].label}</span>
           </p>
         </div>
-        <input
-          className="search-input"
-          placeholder="Filter by ticker…"
-          value={filter}
-          onChange={e => { setFilter(e.target.value); setChainVisible(150) }}
-        />
+        <div className="markets-controls">
+          <button
+            type="button"
+            className={`pill pill-ghost fav-toggle ${favOnly ? 'active' : ''}`}
+            aria-pressed={favOnly}
+            onClick={() => setFavOnly(v => !v)}
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12" fill={favOnly ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+              <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z" />
+            </svg>
+            Favorites
+          </button>
+          <input
+            className="search-input"
+            placeholder="Filter by ticker…"
+            value={filter}
+            onChange={e => { setFilter(e.target.value); setChainVisible(150) }}
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -108,6 +127,7 @@ export default function MarketsView() {
           <table className="editorial-table">
             <thead>
               <tr>
+                <th className="star-col"></th>
                 <th>Ticker</th>
                 <th className="hide-sm">Name</th>
                 <th className="num">Price</th>
@@ -116,14 +136,15 @@ export default function MarketsView() {
                 <th></th>
               </tr>
             </thead>
-            <tbody key={`stocks-${filter}`}>
+            <tbody key={`stocks-${filter}-${favOnly}`}>
               {rows.map((s, i) => (
                 <tr key={s.ca || s.ticker} className="row-link" style={{ '--i': Math.min(i, 12) }} onClick={e => openChart(e, s)}>
+                  <td className="star-col">
+                    <StarButton ca={s.ca} />
+                  </td>
                   <td>
                     <span className="ticker-cell">
-                      {s.logo
-                        ? <img src={s.logo} alt="" className="tok-logo" loading="lazy" />
-                        : <span className="tok-logo tok-logo-fallback">{s.ticker.slice(0, 2)}</span>}
+                      <TokenLogo token={s} symbol={s.ticker} />
                       <strong>{s.ticker}</strong>
                     </span>
                   </td>
@@ -139,7 +160,7 @@ export default function MarketsView() {
                 </tr>
               ))}
               {!rows.length && (
-                <tr><td colSpan={6} className="empty-cell">Nothing matches “{filter}”.</td></tr>
+                <tr><td colSpan={7} className="empty-cell">{favOnly ? 'No favorites here yet — tap a ★ to save a token.' : `Nothing matches “${filter}”.`}</td></tr>
               )}
             </tbody>
           </table>
@@ -160,6 +181,7 @@ export default function MarketsView() {
             <table className="editorial-table">
               <thead>
                 <tr>
+                  <th className="star-col"></th>
                   <th>Token</th>
                   <th className="hide-sm">Name</th>
                   <th className="num">Price</th>
@@ -168,15 +190,17 @@ export default function MarketsView() {
                   <th></th>
                 </tr>
               </thead>
-              <tbody key={`chain-${filter}`}>
+              <tbody key={`chain-${filter}-${favOnly}`}>
                 {chainShown.map((t, i) => (
                   <tr key={t.ca} className="row-link" style={{ '--i': Math.min(i, 12) }} onClick={e => openChart(e, t)}>
+                    <td className="star-col">
+                      <StarButton ca={t.ca} />
+                    </td>
                     <td>
                       <span className="ticker-cell">
-                        {t.logo
-                          ? <img src={t.logo} alt="" className="tok-logo" loading="lazy" />
-                          : <span className="tok-logo tok-logo-fallback">{t.symbol.slice(0, 2)}</span>}
+                        <TokenLogo token={t} symbol={t.symbol} />
                         <strong>{t.symbol}</strong>
+                        <VerifiedBadge token={t} />
                         {t.score != null && (
                           <span
                             className={`score-badge ${t.flagged ? 'flagged' : t.score >= 7 ? 'good' : t.score >= 4 ? 'mid' : 'low'}`}
@@ -198,6 +222,9 @@ export default function MarketsView() {
                     </td>
                   </tr>
                 ))}
+                {!chainShown.length && (
+                  <tr><td colSpan={7} className="empty-cell">{favOnly ? 'No favorites here yet — tap a ★ to save a token.' : `Nothing matches “${filter}”.`}</td></tr>
+                )}
               </tbody>
             </table>
           </div>
