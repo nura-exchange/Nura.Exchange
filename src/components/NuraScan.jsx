@@ -84,31 +84,33 @@ function Full({ ca, token }) {
 // Presentational panel: renders a scan purely from state it is given, so a
 // parent (e.g. the standalone Scan view) can drive the hook and reuse this UI.
 export function NuraScanPanel({ ca, status, result, message, retry }) {
-  if (status === 'starting' || status === 'crawling') {
+  // Any non-final state (idle / starting / crawling — and a 'done' that somehow
+  // arrived without a payload) renders the in-progress view, never the result.
+  if (status !== 'done' || !result) {
+    if (status === 'unsupported') {
+      return (
+        <div className="nura">
+          <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
+          <div className="nura-unsupported">
+            <div className="nura-unsupported-title">Scan unavailable for this token</div>
+            <p className="nura-note">{message}</p>
+            <p className="nura-note dim">CrawlScan only covers Pons V2, Flap or Bankr launchpads, and our on-chain pass couldn’t read this contract (non-standard token or RPC unavailable).</p>
+          </div>
+        </div>
+      )
+    }
+    if (status === 'error') {
+      return (
+        <div className="nura">
+          <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
+          <div className="nura-error">{message}<button type="button" className="pill pill-ghost xs" onClick={retry}>Retry</button></div>
+        </div>
+      )
+    }
     return (
       <div className="nura">
         <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
         <div className="nura-crawling"><span className="nura-spider" />Crawling top holders onchain…</div>
-      </div>
-    )
-  }
-  if (status === 'unsupported') {
-    return (
-      <div className="nura">
-        <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
-        <div className="nura-unsupported">
-          <div className="nura-unsupported-title">Scan unavailable for this token</div>
-          <p className="nura-note">{message}</p>
-          <p className="nura-note dim">CrawlScan only covers Pons V2, Flap or Bankr launchpads, and our on-chain pass couldn’t read this contract (non-standard token or RPC unavailable).</p>
-        </div>
-      </div>
-    )
-  }
-  if (status === 'error') {
-    return (
-      <div className="nura">
-        <div className="nura-head"><span className="nura-brand">NuraScan</span></div>
-        <div className="nura-error">{message}<button type="button" className="pill pill-ghost xs" onClick={retry}>Retry</button></div>
       </div>
     )
   }
