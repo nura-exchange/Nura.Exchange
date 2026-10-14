@@ -14,7 +14,7 @@ export default function TickerTape() {
   if (items.length < 8) return null
 
   function open(s) {
-    setSwapPrefill({ to: { ...s, symbol: s.ticker, address: s.ca, decimals: s.decimals ?? null } })
+    setSwapPrefill({ to: { ...s, symbol: s.ticker, address: s.ca, decimals: 18 } })
     setActiveTab('Swap')
   }
 

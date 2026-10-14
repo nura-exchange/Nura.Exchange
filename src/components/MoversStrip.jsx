@@ -34,7 +34,7 @@ export default function MoversStrip() {
   if (loading || !list.length) return null
 
   function trade(tok) {
-    setSwapPrefill({ to: { ...tok, symbol: tok.ticker, address: tok.ca, decimals: tok.decimals ?? null } })
+    setSwapPrefill({ to: { ...tok, symbol: tok.ticker, address: tok.ca, decimals: 18 } })
     setActiveTab('Swap')
   }
 
@@ -57,7 +57,9 @@ export default function MoversStrip() {
         {list.slice(0, 6).map(s => (
           <button key={s.ca || s.ticker} type="button" className="mover" onClick={() => trade(s)}>
             <span className="mover-top">
-              <span className="tok-logo tok-logo-fallback">{s.ticker.slice(0, 2)}</span>
+              {s.logo
+                ? <img src={s.logo} alt="" className="tok-logo" loading="lazy" />
+                : <span className="tok-logo tok-logo-fallback">{s.ticker.slice(0, 2)}</span>}
               <strong>{s.ticker}</strong>
               <span className={`mono mover-ch ${s.change24h > 0 ? 'up' : s.change24h < 0 ? 'down' : ''}`}>
                 {s.change24h == null ? '—' : `${s.change24h > 0 ? '+' : ''}${s.change24h.toFixed(2)}%`}

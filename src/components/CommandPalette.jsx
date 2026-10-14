@@ -78,7 +78,9 @@ export default function CommandPalette() {
     else if (it.type === 'check') { setChecking(it.addr); setOpen(false); return }
     else {
       const t = it.tok
-      setSwapPrefill({ to: { ...t, symbol: t.sym, address: t.ca || t.address, decimals: t.decimals ?? null } })
+      // stock tokens carry no decimals field — they're 18 on Robinhood Chain
+      const decimals = t.decimals ?? (t.ticker && t.ca ? 18 : null)
+      setSwapPrefill({ to: { ...t, symbol: t.sym, address: t.ca || t.address, decimals } })
       setActiveTab('Swap')
     }
     setOpen(false)

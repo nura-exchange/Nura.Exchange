@@ -53,8 +53,10 @@ export default function HeroSearch() {
   }, [])
 
   function pick(tok) {
+    // stock tokens carry no decimals field — they're 18 on Robinhood Chain
+    const decimals = tok.decimals ?? (tok.ticker && tok.ca ? 18 : null)
     setSwapPrefill({
-      to: { ...tok, symbol: tok.sym, address: tok.ca || tok.address, decimals: tok.decimals ?? null },
+      to: { ...tok, symbol: tok.sym, address: tok.ca || tok.address, decimals },
     })
     setActiveTab('Swap')
   }

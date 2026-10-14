@@ -78,22 +78,20 @@ export default function SwapView() {
   const usdgBal = useTokenBalance(USDG_ADDRESS, 6)
   const fromBalance = fromSel === 'ETH' ? nativeBal : usdgBal
 
-  // prefill from Markets
+  // prefill from Markets — single effect so the AAPL default can't race the prefill on mount
   useEffect(() => {
     if (swapPrefill?.to) {
       setToToken(swapPrefill.to)
       setSwapPrefill(null)
       setQuote(null)
       setRelayQuote(null)
+      return
     }
-  }, [swapPrefill, setSwapPrefill])
-
-  useEffect(() => {
     if (!toToken) {
       const aapl = stocks.find(s => s.ticker === 'AAPL') || stocks[0]
       if (aapl) setToToken({ ...aapl, symbol: aapl.symbol || aapl.ticker, address: aapl.ca, decimals: 18 })
     }
-  }, [stocks, toToken])
+  }, [swapPrefill, setSwapPrefill, stocks, toToken])
 
   // Quoro-sourced tokens carry no decimals — resolve them from LI.FI's token registry.
   useEffect(() => {
