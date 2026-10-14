@@ -77,8 +77,13 @@ export default function NuraScan({ ca, token, compact, onDetails }) {
 }
 
 function Full({ ca, token }) {
-  const { status, result, message, retry } = useNuraScan(ca, token)
+  const scan = useNuraScan(ca, token)
+  return <NuraScanPanel ca={ca} {...scan} />
+}
 
+// Presentational panel: renders a scan purely from state it is given, so a
+// parent (e.g. the standalone Scan view) can drive the hook and reuse this UI.
+export function NuraScanPanel({ ca, status, result, message, retry }) {
   if (status === 'starting' || status === 'crawling') {
     return (
       <div className="nura">

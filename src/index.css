@@ -2365,3 +2365,89 @@ button { font-family: inherit; }
   .market-seg-btn { padding: 8px 6px; font-size: 10px; }
   .wordmark { font-size: 17px; }
 }
+
+/* ---------------- Scan view ---------------- */
+.scan-view { max-width: 780px; }
+.scan-hero { margin-bottom: 26px; }
+.scan-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--pine-bright); margin-bottom: 14px;
+}
+.scan-eyebrow-dot {
+  width: 7px; height: 7px; border-radius: 999px; background: var(--pine-bright);
+  animation: scanPulseDot 2s ease-out infinite;
+}
+.scan-title { margin-bottom: 10px; }
+.scan-note { max-width: 560px; }
+
+.scan-bar { display: flex; gap: 10px; align-items: stretch; margin-bottom: 14px; }
+.scan-input-wrap {
+  position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  padding: 0 16px; height: 58px; overflow: hidden;
+  border: 1px solid var(--line-2); border-radius: 18px;
+  background: linear-gradient(180deg, var(--raised), var(--panel));
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.scan-input-wrap:focus-within { border-color: var(--pine-bright); box-shadow: 0 0 0 3px rgba(63,158,116,0.12); }
+.scan-input-icon { color: var(--pine-bright); font-size: 18px; flex: none; opacity: .85; }
+.scan-input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  color: var(--silver-bright); font-size: 15px; letter-spacing: 0.01em;
+}
+.scan-input::placeholder { color: var(--silver-3); }
+.scan-btn { height: 58px; padding: 0 26px; border-radius: 18px; flex: none; }
+.scan-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.scan-beam {
+  position: absolute; top: 0; bottom: 0; width: 40%; left: -45%;
+  background: linear-gradient(90deg, transparent, rgba(63,158,116,0.20), rgba(63,158,116,0.04), transparent);
+  border-right: 2px solid var(--pine-bright); opacity: 0; pointer-events: none;
+}
+.scan-bar.is-scanning .scan-beam { opacity: 1; animation: scanBeam 1.15s ease-in-out infinite; }
+.scan-bar.is-scanning .scan-input-wrap { border-color: var(--pine-bright); }
+
+.scan-examples { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; font-size: 12px; }
+
+.scan-idle {
+  display: flex; flex-direction: column; align-items: center; gap: 22px;
+  padding: 48px 20px; border: 1px dashed var(--line-2); border-radius: 18px;
+}
+.scan-radar { position: relative; width: 132px; height: 132px; }
+.scan-ring { position: absolute; inset: 0; margin: auto; border: 1px solid var(--line-2); border-radius: 999px; }
+.scan-ring:nth-child(1) { width: 132px; height: 132px; }
+.scan-ring:nth-child(2) { width: 92px; height: 92px; }
+.scan-ring:nth-child(3) { width: 52px; height: 52px; }
+.scan-sweep {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: conic-gradient(from 0deg, rgba(63,158,116,0.42), rgba(63,158,116,0.02) 40%, transparent 62%);
+  animation: scanSweep 3.2s linear infinite;
+}
+.scan-core {
+  position: absolute; inset: 0; margin: auto; width: 10px; height: 10px; border-radius: 999px;
+  background: var(--pine-bright); box-shadow: 0 0 16px 3px rgba(63,158,116,0.5);
+  animation: scanCore 2.2s ease-in-out infinite;
+}
+.scan-idle-text { font-size: 13px; }
+
+.scan-result { animation: scanReveal 0.5s var(--ease-glide, ease) both; }
+.scan-result-addr { font-size: 12px; margin-bottom: 10px; letter-spacing: 0.02em; }
+
+@keyframes scanBeam { 0% { left: -45%; } 100% { left: 105%; } }
+@keyframes scanPulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(63,158,116,0.5); }
+  70% { box-shadow: 0 0 0 9px rgba(63,158,116,0); }
+  100% { box-shadow: 0 0 0 0 rgba(63,158,116,0); }
+}
+@keyframes scanSweep { to { transform: rotate(360deg); } }
+@keyframes scanCore { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .7; } }
+@keyframes scanReveal { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 600px) {
+  .scan-bar { flex-direction: column; }
+  .scan-btn { width: 100%; }
+  .scan-radar { width: 112px; height: 112px; }
+  .scan-ring:nth-child(1) { width: 112px; height: 112px; }
+  .scan-ring:nth-child(2) { width: 78px; height: 78px; }
+  .scan-ring:nth-child(3) { width: 44px; height: 44px; }
+}

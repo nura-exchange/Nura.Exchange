@@ -14,6 +14,7 @@ import PortfolioView from './components/views/PortfolioView'
 import HistoryView from './components/views/HistoryView'
 import SwapView from './components/views/SwapView'
 import BridgeView from './components/views/BridgeView'
+import ScanView from './components/views/ScanView'
 import NewsView from './components/views/NewsView'
 import DocsView from './components/views/DocsView'
 
@@ -114,8 +115,9 @@ function Page() {
             {activeTab === 'Markets' && <MarketsView />}
             {activeTab === 'Markets' && <ManifestoBand />}
             {activeTab === 'Swap' && <SwapView />}
-            {activeTab === 'Bridge' && <BridgeView />}
-            {activeTab === 'Portfolio' && <PortfolioView />}
+          {activeTab === 'Bridge' && <BridgeView />}
+          {activeTab === 'Scan' && <ScanView />}
+          {activeTab === 'Portfolio' && <PortfolioView />}
             {activeTab === 'History' && <HistoryView />}
             {activeTab === 'News' && <NewsView />}
             {activeTab === 'Docs' && <DocsView />}

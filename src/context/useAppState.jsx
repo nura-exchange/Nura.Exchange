@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { loadFavorites, saveFavorites, toggleFav } from '../lib/favorites'
 
-const TABS = ['Markets', 'Swap', 'Bridge', 'Portfolio', 'History', 'News', 'Docs']
+const TABS = ['Markets', 'Swap', 'Bridge', 'Scan', 'Portfolio', 'History', 'News', 'Docs']
 
 const AppContext = createContext(null)
 
