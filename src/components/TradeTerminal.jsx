@@ -8,6 +8,7 @@ import { useExecuteSwap } from '../hooks/useExecuteSwap'
 import { USDG_ADDRESS, robinhoodChain, txUrl } from '../config'
 import { getQuote, quoteError, remember, parseUnits, formatUnits } from '../lib/trade'
 import { getQuoroQuote, normalizeQuoro, executeQuoroQuote } from '../lib/quoro'
+import { getUpQuote } from '../lib/up'
 import ChartSvg from './PriceChart'
 import { RANGES, fmtPrice, fmtVol } from '../lib/chart'
 import { useCandles } from '../hooks/useCandles'
@@ -126,8 +127,7 @@ function TradeTicket({ token, onClose }) {
   const sameToken = fromToken.address?.toLowerCase() === toToken.address?.toLowerCase()
 
   // Market quote on Robinhood Chain only — cross-chain lives in the Swap view.
-  // Quoro's server knows bonding-curve launches and v4 pools; LI.FI covers everything
-  // else — race both and keep the better output.
+  // Race three sources: Quoro (bonding-curve + v4), LI.FI, and up.'s native AMM — keep the best output.
   useEffect(() => {
     setQuote(null)
     setQuoro(null)
@@ -154,11 +154,41 @@ function TradeTicket({ token, onClose }) {
             .then(q => ({ ok: true, q }))
             .catch(() => ({ ok: false }))
         : Promise.resolve({ skip: true })
-      Promise.all([lifi, qq]).then(([l, q]) => {
+      const upq = getUpQuote({
+        tokenIn: fromToken.address,
+        tokenOut: toToken.address,
+        amountIn: parsedIn,
+        account: from,
+        slippage: SLIPPAGE,
+      })
+        .then(q => ({ ok: true, q }))
+        .catch(() => ({ ok: false }))
+      Promise.all([lifi, qq, upq]).then(([l, q, u]) => {
         if (id !== reqId.current) return
         setQuoting(false)
-        if (l.ok) { setQuote(l.q); setQuoteErr(null) } else setQuoteErr(quoteError(l.e))
-        if (q.ok) setQuoro(normalizeQuoro(q.q))
+        const dec = toToken?.decimals ?? 18
+        const lifiOutN = l.ok && l.q?.estimate?.toAmount
+          ? parseFloat(formatUnits(BigInt(l.q.estimate.toAmount), dec))
+          : null
+        const quoroOutN = !q.skip && q.ok && q.q?.out != null ? parseFloat(q.q.out) : null
+        const upOutN = u.ok && u.q?.estimate?.toAmount
+          ? parseFloat(formatUnits(BigInt(u.q.estimate.toAmount), dec))
+          : null
+        const cands = []
+        if (lifiOutN != null) cands.push({ n: lifiOutN, kind: 'lifi', q: l.q })
+        if (quoroOutN != null) cands.push({ n: quoroOutN, kind: 'quoro', q: normalizeQuoro(q.q) })
+        if (upOutN != null) cands.push({ n: upOutN, kind: 'up', q: u.q })
+        cands.sort((a, b) => b.n - a.n)
+        if (cands[0]?.kind === 'quoro') {
+          setQuoro(cands[0].q)
+          setQuote(l.ok ? l.q : null)
+        } else if (cands[0]) {
+          setQuote(cands[0].q)
+          setQuoro(null)
+        } else {
+          setQuote(null); setQuoro(null)
+          setQuoteErr(l.ok ? 'No route found' : quoteError(l.e))
+        }
       })
     }, 550)
     return () => clearTimeout(t)

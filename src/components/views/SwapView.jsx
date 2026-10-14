@@ -8,6 +8,7 @@ import { useExecuteSwap } from '../../hooks/useExecuteSwap'
 import { USDG_ADDRESS, robinhoodChain, NATIVE } from '../../config'
 import { getQuote, quoteError, remember, parseUnits, formatUnits, txUrl } from '../../lib/trade'
 import { getRelayQuote, RelayError } from '../../services/relay'
+import { getUpQuote } from '../../lib/up'
 
 const SLIPPAGE = 1
 
@@ -163,18 +164,41 @@ export default function SwapView() {
     setQuoting(true)
     const t = setTimeout(() => {
       if (!isCrossChain) {
-        getQuote({
-          fromChain: robinhoodChain.id,
-          toChain: robinhoodChain.id,
-          fromToken: fromToken.address,
-          toToken: toToken.address,
-          fromAmount: parsedIn.toString(),
-          fromAddress: from,
-          slippage: SLIPPAGE,
-        })
-          .then(q => { if (id === reqId.current) { setQuote(q); setQuoteErr(null) } })
-          .catch(e => { if (id === reqId.current) setQuoteErr(quoteError(e)) })
-          .finally(() => { if (id === reqId.current) setQuoting(false) })
+        // Race LI.FI against up.'s native AMM and keep the route that delivers more.
+        Promise.allSettled([
+          getQuote({
+            fromChain: robinhoodChain.id,
+            toChain: robinhoodChain.id,
+            fromToken: fromToken.address,
+            toToken: toToken.address,
+            fromAmount: parsedIn.toString(),
+            fromAddress: from,
+            slippage: SLIPPAGE,
+          }),
+          getUpQuote({
+            tokenIn: fromToken.address,
+            tokenOut: toToken.address,
+            amountIn: parsedIn,
+            account: from,
+            slippage: SLIPPAGE,
+          }),
+        ]).then(([lifiRes, upRes]) => {
+          if (id !== reqId.current) return
+          const lifiQ = lifiRes.status === 'fulfilled' ? lifiRes.value : null
+          const upQ = upRes.status === 'fulfilled' ? upRes.value : null
+          const lifiOut = lifiQ?.estimate?.toAmount ? BigInt(lifiQ.estimate.toAmount) : null
+          const upOut = upQ?.estimate?.toAmount ? BigInt(upQ.estimate.toAmount) : null
+          if (upOut != null && (lifiOut == null || upOut >= lifiOut)) {
+            setQuote(upQ); setQuoteErr(null)
+          } else if (lifiQ) {
+            setQuote(lifiQ); setQuoteErr(null)
+          } else {
+            const e = lifiRes.status === 'rejected' ? lifiRes.reason
+              : upRes.status === 'rejected' ? upRes.reason : null
+            setQuoteErr(e ? quoteError(e) : 'No route found')
+          }
+          setQuoting(false)
+        }).catch(() => { if (id === reqId.current) setQuoting(false) })
       } else {
         // Race Relay and LI.FI in parallel and keep the route that delivers more
         // (Quoro's approach); a failure on one side hands the win to the other.
@@ -339,7 +363,7 @@ export default function SwapView() {
         </p>
         <InsightPanel token={toToken} />
         <ul className="split-meta">
-          <li><span>Routing</span><span>{isCrossChain ? 'Relay · cross-chain 1-click' : 'LI.FI · best price'}</span></li>
+          <li><span>Routing</span><span>{isCrossChain ? 'Relay · cross-chain 1-click' : 'LI.FI + up. · best price'}</span></li>
           <li><span>Custody</span><span>Self — your keys only</span></li>
           <li><span>Slippage</span><span>{SLIPPAGE}%</span></li>
         </ul>

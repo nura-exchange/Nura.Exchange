@@ -23,6 +23,20 @@ export const NATIVE = '0x0000000000000000000000000000000000000000'
 export const USDG_ADDRESS = '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168'
 export const WETH_ADDRESS = '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'
 export const EXPLORER = 'https://robinhoodchain.blockscout.com'
+
+// up. — native ve(3,3) DEX on Robinhood Chain (Aerodrome fork): v2 AMM + Slipstream CLAMM.
+export const UP_TOKEN_ADDRESS = '0x57C0E45cB534413D1C20A4240955d6bB250BB4F1'
+export const UP = {
+  v2Factory: '0xFA5429AEBa338BEa2BFcc1b9a889862Ee395bc28',
+  v2Router: '0xf5198743240fAC98db71868F34c70139b1eb0474',
+  clFactory: '0x1ac9dB4a2608ba45D6127B1737949b51Bb54B7F3',
+  swapRouter: '0xC062b870E813fcA720f1e002c234369Ab3aB9415',
+  quoterV2: '0x03983AB2C057a2eac211ff01738a1e49ff325B49',
+}
+export const UP_SUBGRAPHS = {
+  v2: 'https://api.goldsky.com/api/public/project_cmhef02640198x7p2cz2w70u8/subgraphs/up-robinhood-v2-mainnet/0.1.0/gn',
+  v3: 'https://api.goldsky.com/api/public/project_cmhef02640198x7p2cz2w70u8/subgraphs/up-robinhood-v3-mainnet/0.1.1/gn',
+}
 export const txUrl = (hash) => `${EXPLORER}/tx/${hash}`
 export const addressUrl = (addr) => `${EXPLORER}/address/${addr}`
 

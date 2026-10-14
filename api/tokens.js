@@ -2,9 +2,10 @@
 //  - Quoro launches: scored memecoin launches (CORS-open), ranked by 24h volume
 //  - LI.FI token registry: established tokens with prices, decimals, logos
 //  - GeckoTerminal top pools: live pool prices, volumes, logos
+//  - up. (native ve(3,3) DEX): v2 pairs + v3 Slipstream pools via Goldsky subgraphs
 //  - DexScreener API (batches of 30): live price / 24h change / volume / liquidity for pooled tokens
 //  - Multicall3 on the chain: totalSupply + decimals → price = mcap / supply for bonding-curve launches
-// GET /api/tokens → { ok, tokens: [{ symbol, name, ca, decimals, priceUsd, change24h, vol24h, mcap, logo, score, flagged, ageMin, graduated }] }
+// GET /api/tokens → { ok, tokens: [{ symbol, name, ca, decimals, priceUsd, change24h, vol24h, mcap, logo, score, flagged, ageMin, graduated, liq, src }] }
 
 import { encodeFunctionData, decodeFunctionResult, parseAbi } from 'viem'
 
@@ -14,6 +15,8 @@ const LIFI = 'https://li.quest/v1/tokens?chain=4663'
 const DS = 'https://api.dexscreener.com/tokens/v1/robinhood'
 const RPC = 'https://rpc.mainnet.chain.robinhood.com'
 const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11'
+const UP_V2_SUBGRAPH = 'https://api.goldsky.com/api/public/project_cmhef02640198x7p2cz2w70u8/subgraphs/up-robinhood-v2-mainnet/0.1.0/gn'
+const UP_V3_SUBGRAPH = 'https://api.goldsky.com/api/public/project_cmhef02640198x7p2cz2w70u8/subgraphs/up-robinhood-v3-mainnet/0.1.1/gn'
 const GT_PAGES = 10
 const SORTS = ['all', 'trending', 'recent']
 const ZERO = '0x0000000000000000000000000000000000000000'
@@ -136,6 +139,87 @@ async function fetchGt() {
   return map
 }
 
+async function gql(url, query) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ query }),
+  })
+  if (!r.ok) throw new Error(`${url} -> ${r.status}`)
+  const j = await r.json()
+  if (j.errors) throw new Error(j.errors[0]?.message || 'subgraph error')
+  return j.data
+}
+
+// up. (native ve(3,3) DEX, Aerodrome fork): v2 pairs + v3 Slipstream pools via Goldsky.
+async function fetchUp() {
+  const map = new Map()
+  const volByToken = new Map()
+  const [v2, v3] = await Promise.all([
+    gql(UP_V2_SUBGRAPH, `{
+      pairs(first: 100, orderBy: volumeUSD, orderDirection: desc) {
+        stable volumeUSD totalValueLockedUSD
+        token0 { id symbol name decimals }
+        token1 { id symbol name decimals }
+        token0Price token1Price
+      }
+    }`).catch(() => null),
+    gql(UP_V3_SUBGRAPH, `{
+      pools(first: 50, orderBy: totalValueLockedUSD, orderDirection: desc) {
+        volumeUSD totalValueLockedUSD
+        token0 { id symbol name decimals }
+        token1 { id symbol name decimals }
+        token0Price token1Price
+      }
+    }`).catch(() => null),
+  ])
+  const absorb = (tok, price, vol, liqShare) => {
+    if (!tok?.id || !tok.symbol) return
+    const key = tok.id.toLowerCase()
+    volByToken.set(key, (volByToken.get(key) || 0) + (parseFloat(vol) || 0))
+    if (map.has(key)) {
+      const prev = map.get(key)
+      prev.priceUsd = prev.priceUsd ?? price
+      prev.liq = (prev.liq || 0) + liqShare
+      return
+    }
+    addToken(map, {
+      symbol: String(tok.symbol).toUpperCase(),
+      name: tok.name || tok.symbol,
+      ca: tok.id,
+      decimals: parseInt(tok.decimals, 10) || null,
+      priceUsd: price,
+      change24h: null,
+      vol24h: parseFloat(vol) || 0,
+      mcap: null,
+      logo: null,
+      score: null,
+      flagged: null,
+      ageMin: null,
+      graduated: null,
+      liq: liqShare,
+      src: 'up',
+    })
+  }
+  for (const p of v2?.pairs || []) {
+    const vol = p.volumeUSD
+    const liq = (parseFloat(p.totalValueLockedUSD) || 0) / 2
+    absorb(p.token0, parseFloat(p.token0Price) || null, vol, liq)
+    absorb(p.token1, parseFloat(p.token1Price) || null, vol, liq)
+  }
+  for (const p of v3?.pools || []) {
+    const vol = p.volumeUSD
+    const liq = (parseFloat(p.totalValueLockedUSD) || 0) / 2
+    absorb(p.token0, parseFloat(p.token0Price) || null, vol, liq)
+    absorb(p.token1, parseFloat(p.token1Price) || null, vol, liq)
+  }
+  for (const [key, v] of volByToken) {
+    const t = map.get(key)
+    if (t) t.vol24h = v
+  }
+  return map
+}
+
 // Live pool data for known addresses: price, 24h change, volume, mcap, liquidity (base side only).
 async function fetchDexScreener(addresses) {
   const chunks = []
@@ -223,9 +307,9 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
   try {
-    const [quoro, lifi, gt] = await Promise.all([fetchQuoro(), fetchLifi(), fetchGt()])
+    const [quoro, lifi, gt, up] = await Promise.all([fetchQuoro(), fetchLifi(), fetchGt(), fetchUp()])
 
-    // Union: Quoro first (scores), then LI.FI, then GeckoTerminal — later sources fill the gaps.
+    // Union: Quoro first (scores), then LI.FI, then GeckoTerminal, then up. — later sources fill the gaps.
     const merged = new Map(quoro)
     for (const [key, t] of lifi) {
       const prev = merged.get(key)
@@ -243,6 +327,20 @@ export default async function handler(req, res) {
         mcap: prev.mcap ?? t.mcap,
         logo: prev.logo || t.logo,
         decimals: prev.decimals ?? t.decimals,
+      })
+    }
+    for (const [key, t] of up) {
+      const prev = merged.get(key)
+      if (!prev) merged.set(key, t)
+      else merged.set(key, {
+        ...prev,
+        priceUsd: prev.priceUsd ?? t.priceUsd,
+        change24h: prev.change24h ?? t.change24h,
+        vol24h: Math.max(prev.vol24h || 0, t.vol24h || 0),
+        mcap: prev.mcap ?? t.mcap,
+        logo: prev.logo || t.logo,
+        decimals: prev.decimals ?? t.decimals,
+        liq: prev.liq ?? t.liq,
       })
     }
 
