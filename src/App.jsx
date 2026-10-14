@@ -9,6 +9,10 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Hero from './components/Hero'
 import ManifestoBand from './components/ManifestoBand'
+import MoversStrip from './components/MoversStrip'
+import HowSection from './components/HowSection'
+import TickerTape from './components/TickerTape'
+import { usePointerFx } from './hooks/usePointerFx'
 import MarketsView from './components/views/MarketsView'
 import PortfolioView from './components/views/PortfolioView'
 import HistoryView from './components/views/HistoryView'
@@ -68,6 +72,7 @@ function ScrollProgress() {
 
 function Page() {
   const { activeTab } = useAppState()
+  usePointerFx()
 
   useEffect(() => {
     window.scrollTo({ top: 0 })
@@ -110,9 +115,12 @@ function Page() {
       {activeTab !== 'Bridge' && <WrongNetworkBanner />}
       <div className="page-body">
         {activeTab === 'Markets' && <Hero />}
+        {activeTab === 'Markets' && <TickerTape />}
         <ErrorBoundary>
           <div className="view-fade" key={activeTab}>
+            {activeTab === 'Markets' && <MoversStrip />}
             {activeTab === 'Markets' && <MarketsView />}
+            {activeTab === 'Markets' && <HowSection />}
             {activeTab === 'Markets' && <ManifestoBand />}
             {activeTab === 'Swap' && <SwapView />}
           {activeTab === 'Bridge' && <BridgeView />}

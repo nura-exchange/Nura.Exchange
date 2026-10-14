@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import InsightPanel from '../InsightPanel'
 import { useAccount } from 'wagmi'
 import { useAppState } from '../../context/useAppState'
 import { useStocks, useEthPrice, useChainTokens, USDG, ETH_TOKEN } from '../../hooks/useMarkets'
@@ -336,6 +337,7 @@ export default function SwapView() {
           Tokenized stocks, stables and crypto — routed through LI.FI across Robinhood Chain liquidity.
           Pay from Base, Arbitrum, Ethereum or Optimism and Relay delivers in one click.
         </p>
+        <InsightPanel token={toToken} />
         <ul className="split-meta">
           <li><span>Routing</span><span>{isCrossChain ? 'Relay · cross-chain 1-click' : 'LI.FI · best price'}</span></li>
           <li><span>Custody</span><span>Self — your keys only</span></li>

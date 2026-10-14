@@ -1,5 +1,36 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useStocks, useEthPrice, useChainTokens } from '../hooks/useMarkets'
+import { useChainPulse } from '../hooks/useChainPulse'
+import { usePulse } from '../hooks/useQuoro'
+import HeroSearch from './HeroSearch'
+
+// Letters rise in one after another
+function SplitText({ text }) {
+  return (
+    <span aria-label={text}>
+      {Array.from(text).map((ch, i) => (
+        <span key={i} className="sl" aria-hidden="true" style={{ '--c': i }}>{ch === ' ' ? '\u00A0' : ch}</span>
+      ))}
+    </span>
+  )
+}
+
+// Three live movers drifting around the logo
+function HeroFloaters() {
+  const { stocks } = useStocks()
+  const top = [...stocks].filter(s => s.change24h != null).sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h)).slice(0, 3)
+  if (top.length < 3) return null
+  return (
+    <div className="floaters" aria-hidden="true">
+      {top.map((s, i) => (
+        <div key={s.ticker} className={`floater f${i + 1}`}>
+          <b>{s.ticker}</b>
+          <span className={s.change24h >= 0 ? 'up' : 'down'}>{s.change24h >= 0 ? '▲' : '▼'} {Math.abs(s.change24h).toFixed(2)}%</span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function fmtUsd(n) {
   if (n === null || n === undefined) return '…'
@@ -39,6 +70,8 @@ function HeroStats() {
   const { stocks } = useStocks()
   const { chainTokens } = useChainTokens()
   const ethPrice = useEthPrice()
+  const { block, blockTimeMs } = useChainPulse()
+  const quoro = usePulse()
 
   const stockCas = new Set(stocks.map(s => (s.ca || '').toLowerCase()))
   const chainCount = chainTokens.filter(t => !stockCas.has((t.ca || '').toLowerCase())).length
@@ -50,8 +83,12 @@ function HeroStats() {
   const stats = [
     ['Markets', shownTotal == null ? '…' : Math.round(shownTotal).toLocaleString('en-US')],
     ['ETH', ethPrice == null ? '…' : fmtUsd(shownEth)],
-    ['Chain', '4663'],
-    ['Networks', '16'],
+    ['Up / down 24h', stocks.some(s => s.change24h != null)
+      ? `${stocks.filter(s => s.change24h > 0).length} / ${stocks.filter(s => s.change24h < 0).length}` : '…'],
+    ['Red-flagged launches', quoro?.flagged == null ? '—' : `${quoro.flagged} of ${quoro.scored}`],
+    ['Block', block == null ? '…' : `#${block.toLocaleString('en-US')}`],
+    ['Block time', blockTimeMs == null ? '…' : blockTimeMs < 1000 ? `${Math.round(blockTimeMs)} ms` : `${(blockTimeMs / 1000).toFixed(1)} s`],
+    ['Networks in', '16'],
   ]
 
   return (
@@ -77,7 +114,8 @@ export default function Hero() {
       <div className="hero-frame">
         <div className="hero-media" aria-hidden="true" />
 
-        <h1 className="hero-slogan">Markets, unbound</h1>
+        <h1 className="hero-slogan"><SplitText text="Markets, unbound" /></h1>
+        <HeroFloaters />
 
         <div className="scroll-badge" aria-hidden="true">
           <svg viewBox="0 0 100 100" width="84" height="84">
@@ -90,7 +128,7 @@ export default function Hero() {
           </svg>
         </div>
 
-        <span className="hero-dot" aria-hidden="true" />
+        <HeroSearch />
       </div>
       <HeroStats />
     </section>
