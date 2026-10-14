@@ -925,7 +925,7 @@ button { font-family: inherit; }
 
 /* ---------------- Tables ---------------- */
 
-.table-wrap { border-top: 1px solid var(--line-2); }
+.table-wrap { border-top: 1px solid var(--line-2); overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 .editorial-table {
   width: 100%;
@@ -2342,4 +2342,26 @@ button { font-family: inherit; }
 }
 @media (max-width: 600px) {
   .scan-facts { grid-template-columns: 1fr; }
+}
+
+/* ---------------- Mobile polish ---------------- */
+@media (max-width: 600px) {
+  .container { padding: 0 16px; }
+  .nav-header { gap: 10px; }
+  .wordmark { font-size: 19px; }
+  .nav-tabs { gap: 16px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .view { padding-top: 34px; padding-bottom: 72px; }
+  .view-head { margin-bottom: 26px; }
+  .market-seg { width: 100%; justify-content: space-between; }
+  .market-seg-btn { padding: 8px 10px; font-size: 11px; flex: 1; text-align: center; }
+  .section-heading { margin-bottom: 10px; }
+  .chain-grid { gap: 7px; margin-top: 18px; }
+  .field-row { gap: 10px; }
+  .swap-arrow { margin: 12px 0; }
+}
+
+@media (max-width: 400px) {
+  .market-seg-btn { padding: 8px 6px; font-size: 10px; }
+  .wordmark { font-size: 17px; }
 }
