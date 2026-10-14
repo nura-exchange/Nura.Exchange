@@ -5,18 +5,24 @@ const TABS = ['Markets', 'Swap', 'Bridge', 'Scan', 'Portfolio', 'History', 'News
 
 // URL routing: each tab lives at its own path (/market, /swap, /scan, …) so
 // links are shareable and refresh/back keep the user where they were.
-// '/' and anything unknown resolve to Markets.
-const pathToTab = (path) => {
-  const seg = String(path || '').replace(/\/+$/, '').split('/').filter(Boolean)[0] || ''
-  return TABS.find((t) => t.toLowerCase() === seg.toLowerCase()) || 'Markets'
+// '/token/0x…' resolves to the Token view with that address; '/' and anything
+// unknown resolve to Markets.
+const ADDR_RE = /^0x[a-fA-F0-9]{40}$/
+const pathToRoute = (path) => {
+  const seg = String(path || '').replace(/\/+$/, '').split('/').filter(Boolean)
+  if ((seg[0] || '').toLowerCase() === 'token' && ADDR_RE.test(seg[1] || '')) {
+    return { tab: 'Token', tokenAddress: seg[1] }
+  }
+  const tab = TABS.find((t) => t.toLowerCase() === (seg[0] || '').toLowerCase()) || 'Markets'
+  return { tab, tokenAddress: null }
 }
 const tabToPath = (tab) => `/${tab.toLowerCase()}`
 
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
-  const [activeTab, setActiveTabState] = useState(() =>
-    typeof window === 'undefined' ? 'Markets' : pathToTab(window.location.pathname)
+  const [{ tab: activeTab, tokenAddress }, setRoute] = useState(() =>
+    typeof window === 'undefined' ? { tab: 'Markets', tokenAddress: null } : pathToRoute(window.location.pathname)
   )
   const [swapPrefill, setSwapPrefill] = useState(null)
   const [notifications, setNotifications] = useState([])
@@ -24,14 +30,21 @@ export function AppProvider({ children }) {
   const notifId = useRef(0)
 
   useEffect(() => {
-    const onPop = () => setActiveTabState(pathToTab(window.location.pathname))
+    const onPop = () => setRoute(pathToRoute(window.location.pathname))
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
   const setActiveTab = useCallback((tab) => {
-    setActiveTabState(tab)
+    setRoute({ tab, tokenAddress: null })
     const path = tabToPath(tab)
+    if (window.location.pathname !== path) window.history.pushState({}, '', path)
+  }, [])
+
+  const openToken = useCallback((ca) => {
+    if (!ADDR_RE.test(String(ca || ''))) return
+    setRoute({ tab: 'Token', tokenAddress: ca })
+    const path = `/token/${ca}`
     if (window.location.pathname !== path) window.history.pushState({}, '', path)
   }, [])
 
@@ -60,7 +73,7 @@ export function AppProvider({ children }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ activeTab, setActiveTab, swapPrefill, setSwapPrefill, tabs: TABS, notifications, notify, dismissNotification, favorites, toggleFavorite, isFavorite }}>
+    <AppContext.Provider value={{ activeTab, tokenAddress, setActiveTab, openToken, swapPrefill, setSwapPrefill, tabs: TABS, notifications, notify, dismissNotification, favorites, toggleFavorite, isFavorite }}>
       {children}
     </AppContext.Provider>
   )

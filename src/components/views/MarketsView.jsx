@@ -51,7 +51,7 @@ export default function MarketsView() {
   const { stocks, loading } = useStocks()
   const { chainTokens, loading: chainLoading } = useChainTokens()
   const ethPrice = useEthPrice()
-  const { isFavorite } = useAppState()
+  const { isFavorite, openToken } = useAppState()
   const [market, setMarket] = useState('stocks')
   const [filter, setFilter] = useState('')
   const [updated, setUpdated] = useState(null)
@@ -66,7 +66,8 @@ export default function MarketsView() {
 
   function openChart(e, tok) {
     if (e.target.closest('button')) return
-    setTermTok(tok)
+    if (tok.ca) openToken(tok.ca)
+    else setTermTok(tok)
   }
   function trade(tok) { setTermTok(tok) }
 

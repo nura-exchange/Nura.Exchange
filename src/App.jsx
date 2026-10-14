@@ -21,6 +21,7 @@ import BridgeView from './components/views/BridgeView'
 import ScanView from './components/views/ScanView'
 import NewsView from './components/views/NewsView'
 import DocsView from './components/views/DocsView'
+import TokenView from './components/views/TokenView'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
 import WrongNetworkBanner from './components/WrongNetworkBanner'
@@ -129,6 +130,7 @@ function Page() {
             {activeTab === 'History' && <HistoryView />}
             {activeTab === 'News' && <NewsView />}
             {activeTab === 'Docs' && <DocsView />}
+            {activeTab === 'Token' && <TokenView />}
           </div>
         </ErrorBoundary>
       </div>
