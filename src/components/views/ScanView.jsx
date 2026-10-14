@@ -13,15 +13,16 @@ const EXAMPLES = [
 export default function ScanView() {
   const [input, setInput] = useState('')
   const [ca, setCa] = useState(null)
-  const scan = useNuraScan(ca)
+  const [nonce, setNonce] = useState(0)
+  const scan = useNuraScan(ca, undefined, nonce)
   const scanning = scan.status === 'starting' || scan.status === 'crawling'
 
-  const submit = (raw, e) => {
-    e?.preventDefault?.()
-    const m = String(raw ?? input).match(ADDR_RE)
+  const runScan = (text) => {
+    const m = String(text ?? input).match(ADDR_RE)
     if (!m) return
     setInput(m[0])
     setCa(m[0].toLowerCase())
+    setNonce(n => n + 1)
   }
 
   const valid = ADDR_RE.test(input.trim())
@@ -37,7 +38,7 @@ export default function ScanView() {
         </p>
       </div>
 
-      <form className={`scan-bar ${scanning ? 'is-scanning' : ''}`} onSubmit={submit}>
+      <form className={`scan-bar ${scanning ? 'is-scanning' : ''}`} onSubmit={(e) => { e.preventDefault(); runScan() }}>
         <div className="scan-input-wrap">
           <span className="scan-beam" aria-hidden="true" />
           <span className="scan-input-icon" aria-hidden="true">⌖</span>
@@ -61,7 +62,7 @@ export default function ScanView() {
       <div className="scan-examples">
         <span className="dim">Try:</span>
         {EXAMPLES.map((x) => (
-          <button key={x.ca} type="button" className="pill pill-ghost xs scan-example" onClick={() => submit(x.ca)}>
+          <button key={x.ca} type="button" className="pill pill-ghost xs scan-example" onClick={() => runScan(x.ca)}>
             {x.label}
           </button>
         ))}

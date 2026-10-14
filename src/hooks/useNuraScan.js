@@ -36,10 +36,10 @@ function mapAnalyze(a, ca, symbol, name) {
 }
 
 // Starts a NuraScan for `ca` and polls until the verdict is ready. If CrawlScan
-// doesn't cover the token we run our own analyzer as a fallback. Returns
-// { status, result, message, retry }.
+// doesn't cover the token we run our own analyzer as a fallback. Bumping `nonce`
+// forces a fresh scan of the same address. Returns { status, result, message, retry }.
 // status: idle | starting | crawling | done | unsupported | error
-export function useNuraScan(ca, token) {
+export function useNuraScan(ca, token, nonce = 0) {
   const [tick, setTick] = useState(0)
   const [state, setState] = useState({ status: ca ? 'starting' : 'idle' })
   const symbol = token?.symbol || token?.ticker || null
@@ -100,7 +100,7 @@ export function useNuraScan(ca, token) {
       }
     })()
     return () => { alive = false; clearTimeout(timer) }
-  }, [ca, symbol, name, tick])
+  }, [ca, symbol, name, nonce, tick])
 
   const retry = useCallback(() => setTick(t => t + 1), [])
   return { ...state, retry }
