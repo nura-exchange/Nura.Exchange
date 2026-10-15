@@ -66,7 +66,7 @@ export default function AskView() {
   const reqId = useRef(0)
 
   useEffect(() => {
-    fetch('/api/tilik/health')
+    fetch('/api/tilik')
       .then(r => r.json())
       .then(j => setHealth(j))
       .catch(() => setHealth({ ok: false }))
