@@ -22,6 +22,7 @@ import ScanView from './components/views/ScanView'
 import NewsView from './components/views/NewsView'
 import DocsView from './components/views/DocsView'
 import TokenView from './components/views/TokenView'
+import AskView from './components/views/AskView'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
 import WrongNetworkBanner from './components/WrongNetworkBanner'
@@ -125,6 +126,7 @@ function Page() {
             {activeTab === 'Markets' && <ManifestoBand />}
             {activeTab === 'Swap' && <SwapView />}
           {activeTab === 'Bridge' && <BridgeView />}
+          {activeTab === 'Ask' && <AskView />}
           {activeTab === 'Scan' && <ScanView />}
           {activeTab === 'Portfolio' && <PortfolioView />}
             {activeTab === 'History' && <HistoryView />}

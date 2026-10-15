@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { loadFavorites, saveFavorites, toggleFav } from '../lib/favorites'
 
-const TABS = ['Markets', 'Swap', 'Bridge', 'Scan', 'Portfolio', 'History', 'News', 'Docs']
+const TABS = ['Markets', 'Swap', 'Bridge', 'Ask', 'Scan', 'Portfolio', 'History', 'News', 'Docs']
 
 // URL routing: each tab lives at its own path (/market, /swap, /scan, …) so
 // links are shareable and refresh/back keep the user where they were.

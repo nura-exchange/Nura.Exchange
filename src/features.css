@@ -176,3 +176,34 @@
   .nura-banner-price { margin-left: 0; }
   .nura-banner-actions { justify-content: flex-end; }
 }
+
+/* ── Ask (TILIK chat) ── */
+.ask-view { max-width: 760px; display: flex; flex-direction: column; min-height: 70vh; }
+.ask-head { padding: 28px 0 12px; }
+.ask-chat { flex: 1; overflow-y: auto; max-height: 56vh; display: flex; flex-direction: column; gap: 14px; padding: 8px 0 16px; }
+.ask-idle { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; padding: 28px 0; }
+.ask-examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.tilik-msg { display: flex; flex-direction: column; gap: 6px; max-width: 92%; }
+.tilik-user { align-self: flex-end; }
+.tilik-ai { align-self: flex-start; }
+.tilik-ai-head { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.tilik-badge { font: 600 10px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--pine-bright); border: 1px solid var(--pine-dim); padding: 2px 6px; border-radius: var(--radius-full); }
+.tilik-bubble { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--wash); font-size: 14px; line-height: 1.55; }
+.tilik-user .tilik-bubble { background: var(--raised); border-color: var(--line-2); }
+.tilik-answer { white-space: pre-wrap; }
+.tilik-sources { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--silver-2); display: grid; gap: 3px; }
+.tilik-sources a { color: var(--silver-bright); }
+.tilik-sources a:hover { color: var(--pine-bright); }
+.tilik-plan { margin-top: 4px; }
+.tilik-plan-toggle { background: none; border: 0; color: var(--silver-3); cursor: pointer; font: 400 11px var(--font-mono); padding: 0; }
+.tilik-plan-toggle:hover { color: var(--silver-bright); }
+.tilik-plan-list { margin: 6px 0 0; padding-left: 16px; font-size: 11px; color: var(--silver-3); display: grid; gap: 2px; }
+.ask-bar { display: flex; gap: 10px; padding: 14px 0 28px; }
+.ask-input { flex: 1; background: var(--wash); border: 1px solid var(--line-2); border-radius: var(--radius-md); color: var(--silver-bright); padding: 12px 14px; font: 400 14px var(--font-sans); }
+.ask-input:focus { outline: none; border-color: var(--pine-bright); }
+.ask-input::placeholder { color: var(--silver-3); }
+.warn { color: var(--warn); }
+@media (max-width: 600px) {
+  .tilik-msg { max-width: 100%; }
+  .ask-chat { max-height: 50vh; }
+}
