@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStocks, useEthPrice, useChainTokens } from '../../hooks/useMarkets'
 import { TableSkeleton } from '../Skeleton'
 import TradeTerminal from '../TradeTerminal'
+import NuraBanner from '../NuraBanner'
 import { marketSession, SESSIONS } from '../../lib/session'
 import { useAppState } from '../../context/useAppState'
 import { TokenLogo, VerifiedBadge, StarButton } from '../TokenBadge'
@@ -186,6 +187,7 @@ export default function MarketsView() {
   return (
     <div className="container view">
       {termTok && <TradeTerminal token={termTok} onClose={() => setTermTok(null)} />}
+      <NuraBanner />
       <div className="view-head row reveal">
         <div>
           <h1 className="section-heading">Markets</h1>

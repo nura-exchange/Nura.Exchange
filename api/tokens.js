@@ -23,6 +23,19 @@ const ZERO = '0x0000000000000000000000000000000000000000'
 const SKIP = new Set(['WETH', 'USDG'])
 const TOTAL_SUPPLY = '0x18160ddd'
 const DECIMALS = '0x313ce567'
+// NURA — our own launch on Pons. Pinned so it always shows in Markets even
+// when Quoro hasn't indexed it yet. Curve contract from the launchpad page.
+const NURA_CA = '0x11a2809ebf14653760c7b1136acdee7cf5c5a9c9'
+const NURA_CURVE = '0xa426f8028e957adb03a111ce89830a1098a8bcd6'
+const CURVE_ABI = parseAbi([
+  'function getReserves() view returns (uint256, uint256)',
+  'function graduated() view returns (bool)',
+  'function graduationThreshold() view returns (uint256)',
+])
+const ERC20_ABI = parseAbi([
+  'function totalSupply() view returns (uint256)',
+  'function decimals() view returns (uint8)',
+])
 const multicallAbi = parseAbi([
   'function aggregate3((address target, bool allowFailure, bytes callData)[] calls) returns ((bool success, bytes returnData)[] returnData)',
 ])
@@ -69,6 +82,57 @@ async function fetchQuoro() {
       })
     }
   }
+  return map
+}
+
+async function rpcCall(to, data) {
+  const r = await fetch(RPC, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] }),
+  })
+  const j = await r.json()
+  return j.result || null
+}
+
+// NURA is pinned: priced live from the Pons bonding curve (reserves) even when
+// Quoro hasn't indexed the launch yet, so it always appears in Markets/Swap.
+async function fetchNura() {
+  const map = new Map()
+  try {
+    const [reserves, graduated, supply, decimals, pulse] = await Promise.all([
+      rpcCall(NURA_CURVE, encodeFunctionData({ abi: CURVE_ABI, functionName: 'getReserves' })),
+      rpcCall(NURA_CURVE, encodeFunctionData({ abi: CURVE_ABI, functionName: 'graduated' })),
+      rpcCall(NURA_CA, encodeFunctionData({ abi: ERC20_ABI, functionName: 'totalSupply' })),
+      rpcCall(NURA_CA, encodeFunctionData({ abi: ERC20_ABI, functionName: 'decimals' })),
+      getJson(`${QUORO}/api/pulse`).catch(() => null),
+    ])
+    if (!reserves || !supply) return map
+    const ethPriceUsd = parseFloat(pulse?.ethUsd) || null
+    const [ethRes, tokRes] = decodeFunctionResult({ abi: CURVE_ABI, functionName: 'getReserves', data: reserves })
+    const dec = decimals ? Number(BigInt(decimals)) : 18
+    const supplyTokens = Number(BigInt(supply)) / 10 ** dec
+    const tokResTokens = Number(tokRes) / 10 ** dec
+    // spot price in ETH from the curve; × ETH/USD when we have it
+    const priceEth = tokResTokens > 0 ? Number(ethRes) / Number(tokRes) : null
+    const priceUsd = priceEth != null && ethPriceUsd ? priceEth * ethPriceUsd : null
+    addToken(map, {
+      symbol: 'NURA',
+      name: 'NURADEX',
+      ca: NURA_CA,
+      decimals: dec,
+      priceUsd,
+      change24h: null,
+      vol24h: 0,
+      mcap: priceUsd != null && supplyTokens > 0 ? priceUsd * supplyTokens : null,
+      logo: 'https://quoro.exchange/img?u=ipfs%3A%2F%2Fbafkreibmu4cbdclp6ncc2ugui37w2ay26j37myelwkegbzb47zt2impazm',
+      score: 7,
+      flagged: false,
+      ageMin: null,
+      graduated: graduated ? BigInt(graduated) !== 0n : false,
+      src: 'nura',
+    })
+  } catch { /* curve unreachable — skip pin */ }
   return map
 }
 
@@ -307,10 +371,25 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
 
   try {
-    const [quoro, lifi, gt, up] = await Promise.all([fetchQuoro(), fetchLifi(), fetchGt(), fetchUp()])
+    const [quoro, lifi, gt, up, nura] = await Promise.all([fetchQuoro(), fetchLifi(), fetchGt(), fetchUp(), fetchNura()])
 
-    // Union: Quoro first (scores), then LI.FI, then GeckoTerminal, then up. — later sources fill the gaps.
-    const merged = new Map(quoro)
+    // Union: pinned NURA first, then Quoro (scores), LI.FI, GeckoTerminal, up. — later sources fill the gaps.
+    const merged = new Map(nura)
+    for (const [key, t] of quoro) {
+      const prev = merged.get(key)
+      if (!prev) merged.set(key, t)
+      else merged.set(key, {
+        ...t,
+        priceUsd: t.priceUsd ?? prev.priceUsd,
+        change24h: t.change24h ?? prev.change24h,
+        vol24h: Math.max(t.vol24h || 0, prev.vol24h || 0),
+        mcap: t.mcap ?? prev.mcap,
+        logo: t.logo || prev.logo,
+        score: t.score ?? prev.score,
+        flagged: t.flagged ?? prev.flagged,
+        src: prev.src === 'nura' ? 'nura' : t.src,
+      })
+    }
     for (const [key, t] of lifi) {
       const prev = merged.get(key)
       if (!prev) merged.set(key, t)
@@ -377,6 +456,10 @@ export default async function handler(req, res) {
     const list = [...merged.values()]
       .sort((a, b) => (b.vol24h || 0) - (a.vol24h || 0) || (b.mcap || 0) - (a.mcap || 0))
       .slice(0, 800)
+
+    // Keep the pinned NURA launch at the top of Markets.
+    const nuraIdx = list.findIndex(t => t.ca?.toLowerCase() === NURA_CA)
+    if (nuraIdx > 0) list.unshift(...list.splice(nuraIdx, 1))
 
     return res.status(200).json({ ok: true, count: list.length, tokens: list })
   } catch (e) {
