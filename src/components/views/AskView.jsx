@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAppState } from '../../context/useAppState'
 
 const EXAMPLES = [
+  'What is NURA token, price and market cap?',
   'What happened on Robinhood Chain today?',
-  'Price of NURA?',
-  'Explain the token 0x11a2809ebf14653760c7b1136acdee7cf5c5a9c9',
+  'Price and liquidity of USDG?',
   'Latest news about tokenized stocks',
 ]
 
@@ -57,7 +56,6 @@ function Msg({ m }) {
 }
 
 export default function AskView() {
-  const { notify } = useAppState()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [msgs, setMsgs] = useState([])
